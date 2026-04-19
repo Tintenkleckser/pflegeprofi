@@ -4,7 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Button } from '@/components/ui/button';
-import { Stethoscope, LayoutDashboard, BookOpen, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
 export function AppHeader() {
@@ -16,7 +16,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Stethoscope className="h-6 w-6 text-primary" />
+          <img src="/synthema-logo.png" alt="SYNTHEMA" className="h-8 w-8 object-contain" />
           <span className="font-display text-lg font-bold tracking-tight">{t('common.appName')}</span>
         </Link>
         <nav className="flex items-center gap-1">

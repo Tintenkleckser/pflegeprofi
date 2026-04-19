@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Stethoscope, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { motion } from 'framer-motion';
 
@@ -54,8 +54,8 @@ export default function LoginPage() {
         className="w-full max-w-md"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-            <Stethoscope className="h-8 w-8 text-primary" />
+          <div className="relative h-20 w-20 mb-2">
+            <img src="/synthema-logo.png" alt="SYNTHEMA – KI-gestützte Qualifizierung" className="h-full w-full object-contain" />
           </div>
           <h1 className="font-display text-2xl font-bold tracking-tight">{t('common.appName')}</h1>
           <p className="text-muted-foreground text-sm mt-1">{t('common.tagline')}</p>
@@ -96,7 +96,7 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                    placeholder="Passwort"
                     value={password}
                     onChange={(e: any) => setPassword(e?.target?.value ?? '')}
                     className="pl-10"
