@@ -7,7 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3 } from 'lucide-react';
+import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SimTemplate {
@@ -17,6 +17,7 @@ interface SimTemplate {
   descriptionDe: string;
   descriptionTr: string;
   difficulty: string;
+  type: string;
   maxTurns: number;
 }
 
@@ -146,34 +147,59 @@ export function DashboardClient() {
         {/* Available Scenarios */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           <h2 className="font-display text-xl font-bold tracking-tight mb-4">{t('dashboard.availableScenarios')}</h2>
-          <div className="grid grid-cols-1 gap-4 mb-8">
-            {(templates ?? []).map((tmpl: SimTemplate) => (
-              <Card key={tmpl?.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <BookOpenCheck className="h-5 w-5 text-primary" />
-                        <h3 className="font-display font-semibold text-lg">
-                          {lang === 'tr' ? tmpl?.titleTr : tmpl?.titleDe}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">{tmpl?.difficulty ?? 'intermediate'}</Badge>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            {(templates ?? []).map((tmpl: SimTemplate, idx: number) => {
+              const typeConfig: Record<string, { icon: any; label: string; labelTr: string; color: string }> = {
+                oral_exam: { icon: MessageSquare, label: 'Mündliche Prüfung', labelTr: 'Sözlü Sınav', color: 'text-blue-600 bg-blue-500/10' },
+                written_task: { icon: PenTool, label: 'Schriftliche Aufgabe', labelTr: 'Yazılı Görev', color: 'text-purple-600 bg-purple-500/10' },
+                patient_conversation: { icon: Users, label: 'Patientengespräch', labelTr: 'Hasta Görüşmesi', color: 'text-green-600 bg-green-500/10' },
+              };
+              const difficultyConfig: Record<string, { label: string; labelTr: string; variant: 'default' | 'secondary' | 'destructive' }> = {
+                beginner: { label: 'Einsteiger', labelTr: 'Başlangıç', variant: 'secondary' },
+                intermediate: { label: 'Mittel', labelTr: 'Orta', variant: 'default' },
+                advanced: { label: 'Fortgeschritten', labelTr: 'İleri', variant: 'destructive' },
+              };
+              const tc = typeConfig[tmpl?.type] ?? typeConfig.oral_exam;
+              const dc = difficultyConfig[tmpl?.difficulty] ?? difficultyConfig.intermediate;
+              const TypeIcon = tc.icon;
+
+              return (
+                <motion.div
+                  key={tmpl?.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + idx * 0.08 }}
+                >
+                  <Card className="hover:shadow-lg transition-all duration-200 group cursor-pointer h-full flex flex-col" onClick={() => router.push(`/simulation/${tmpl?.id}/briefing`)}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${tc.color}`}>
+                          <TypeIcon className="h-5 w-5" />
+                        </div>
+                        <Badge variant={dc.variant} className="text-xs shrink-0">
+                          {lang === 'tr' ? dc.labelTr : dc.label}
+                        </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
+                      <CardTitle className="text-lg leading-tight mt-2 group-hover:text-primary transition-colors">
+                        {lang === 'tr' ? tmpl?.titleTr : tmpl?.titleDe}
+                      </CardTitle>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {lang === 'tr' ? tc.labelTr : tc.label} • {tmpl?.maxTurns ?? 8} Turns
+                      </span>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between pt-0">
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                         {lang === 'tr' ? tmpl?.descriptionTr : tmpl?.descriptionDe}
                       </p>
-                    </div>
-                    <Button
-                      onClick={() => router.push(`/simulation/${tmpl?.id}/briefing`)}
-                      className="gap-2 whitespace-nowrap"
-                    >
-                      <Play className="h-4 w-4" />
-                      {t('common.startSimulation')}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      <Button className="gap-2 w-full group-hover:bg-primary/90" size="sm">
+                        <Play className="h-4 w-4" />
+                        {t('common.startSimulation')}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
 
