@@ -7,8 +7,9 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope, Sparkles, Filter, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 
 interface SimTemplate {
   id: string;
@@ -39,6 +40,8 @@ export function DashboardClient() {
   const [templates, setTemplates] = useState<SimTemplate[]>([]);
   const [history, setHistory] = useState<SimHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterDifficulty, setFilterDifficulty] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<string | null>(null);
   const lang = i18n?.language ?? 'de';
 
   useEffect(() => {
@@ -146,9 +149,61 @@ export function DashboardClient() {
 
         {/* Available Scenarios */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <h2 className="font-display text-xl font-bold tracking-tight mb-4">{t('dashboard.availableScenarios')}</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h2 className="font-display text-xl font-bold tracking-tight">{t('dashboard.availableScenarios')}</h2>
+            <Button className="gap-2" onClick={() => router.push('/simulation/new')}>
+              <Sparkles className="h-4 w-4" />
+              {lang === 'tr' ? 'Yeni Simülasyon Oluştur' : 'Neue Simulation erstellen'}
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex items-center gap-1 mr-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{lang === 'tr' ? 'Filtre:' : 'Filter:'}</span>
+            </div>
+            {DIFFICULTY_LEVELS.map(d => (
+              <Badge
+                key={d.id}
+                variant={filterDifficulty === d.id ? 'default' : 'outline'}
+                className="cursor-pointer transition-colors"
+                onClick={() => setFilterDifficulty(filterDifficulty === d.id ? null : d.id)}
+              >
+                {lang === 'tr' ? d.labelTr : d.labelDe}
+              </Badge>
+            ))}
+            <span className="text-muted-foreground">|</span>
+            {[
+              { id: 'oral_exam', de: 'Mündlich', tr: 'Sözlü' },
+              { id: 'patient_conversation', de: 'Gespräch', tr: 'Görüşme' },
+              { id: 'written_task', de: 'Schriftlich', tr: 'Yazılı' },
+            ].map(tp => (
+              <Badge
+                key={tp.id}
+                variant={filterType === tp.id ? 'default' : 'outline'}
+                className="cursor-pointer transition-colors"
+                onClick={() => setFilterType(filterType === tp.id ? null : tp.id)}
+              >
+                {lang === 'tr' ? tp.tr : tp.de}
+              </Badge>
+            ))}
+            {(filterDifficulty || filterType) && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => { setFilterDifficulty(null); setFilterType(null); }}>
+                <X className="h-3 w-3" />
+                {lang === 'tr' ? 'Sıfırla' : 'Zurücksetzen'}
+              </Button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            {(templates ?? []).map((tmpl: SimTemplate, idx: number) => {
+            {(templates ?? [])
+              .filter((tmpl: SimTemplate) => {
+                if (filterDifficulty && tmpl.difficulty !== filterDifficulty) return false;
+                if (filterType && tmpl.type !== filterType) return false;
+                return true;
+              })
+              .map((tmpl: SimTemplate, idx: number) => {
               const typeConfig: Record<string, { icon: any; label: string; labelTr: string; color: string }> = {
                 oral_exam: { icon: MessageSquare, label: 'Mündliche Prüfung', labelTr: 'Sözlü Sınav', color: 'text-blue-600 bg-blue-500/10' },
                 written_task: { icon: PenTool, label: 'Schriftliche Aufgabe', labelTr: 'Yazılı Görev', color: 'text-purple-600 bg-purple-500/10' },
@@ -158,6 +213,7 @@ export function DashboardClient() {
                 beginner: { label: 'Einsteiger', labelTr: 'Başlangıç', variant: 'secondary' },
                 intermediate: { label: 'Mittel', labelTr: 'Orta', variant: 'default' },
                 advanced: { label: 'Fortgeschritten', labelTr: 'İleri', variant: 'destructive' },
+                extreme: { label: 'Extrem', labelTr: 'Ekstrem', variant: 'destructive' },
               };
               const tc = typeConfig[tmpl?.type] ?? typeConfig.oral_exam;
               const dc = difficultyConfig[tmpl?.difficulty] ?? difficultyConfig.intermediate;
@@ -200,6 +256,22 @@ export function DashboardClient() {
                 </motion.div>
               );
             })}
+            {(templates ?? []).filter((tmpl: SimTemplate) => {
+              if (filterDifficulty && tmpl.difficulty !== filterDifficulty) return false;
+              if (filterType && tmpl.type !== filterType) return false;
+              return true;
+            }).length === 0 && (
+              <Card className="col-span-full">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <Filter className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p className="mb-3">{lang === 'tr' ? 'Bu filtreyle eşleşen senaryo yok.' : 'Keine Szenarien für diesen Filter gefunden.'}</p>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => router.push('/simulation/new')}>
+                    <Sparkles className="h-4 w-4" />
+                    {lang === 'tr' ? 'Yeni oluştur' : 'Neu erstellen'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </motion.div>
 
