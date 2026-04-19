@@ -8,8 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { GlossaryTooltip } from '@/components/glossary-tooltip';
-import { Send, User, Stethoscope, Loader2, CheckCircle2 } from 'lucide-react';
+import { Send, User, Stethoscope, Loader2, CheckCircle2, Mic, MicOff, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -29,6 +30,38 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
   const [languageMode, setLanguageMode] = useState('bilingual');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Speech Recognition
+  const speechLang = lang === 'tr' ? 'tr-TR' : 'de-DE';
+  const {
+    isListening,
+    isSupported: isSpeechSupported,
+    transcript: speechTranscript,
+    interimTranscript,
+    toggleListening,
+    stopListening,
+  } = useSpeechRecognition({
+    lang: speechLang,
+    continuous: true,
+    interimResults: true,
+    onResult: (finalText: string) => {
+      setInput((prev: string) => {
+        const combined = prev ? `${prev} ${finalText}` : finalText;
+        return combined;
+      });
+    },
+  });
+
+  // Update input with interim transcript for visual feedback
+  useEffect(() => {
+    if (isListening && speechTranscript) {
+      setInput((prev: string) => {
+        // Only update if the transcript has new final content
+        const base = prev.replace(/\s*$/, '');
+        return speechTranscript;
+      });
+    }
+  }, [speechTranscript, isListening]);
 
   useEffect(() => {
     const fetchSim = async () => {
@@ -275,19 +308,68 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
         {/* Input Area */}
         {simStatus === 'active' && (
           <div className="border-t py-4">
+            {/* Speech indicator */}
+            {isListening && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
+              >
+                <div className="relative flex items-center justify-center">
+                  <span className="absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                </div>
+                <span className="text-sm text-red-700 dark:text-red-300 font-medium">
+                  {lang === 'tr' ? 'Dinleniyor...' : 'Aufnahme läuft...'}
+                </span>
+                {interimTranscript && (
+                  <span className="text-sm text-muted-foreground italic ml-2 truncate flex-1">
+                    {interimTranscript}
+                  </span>
+                )}
+              </motion.div>
+            )}
             <div className="flex gap-2">
               <Textarea
                 ref={textareaRef}
-                value={input}
+                value={isListening && interimTranscript ? `${input} ${interimTranscript}`.trim() : input}
                 onChange={(e: any) => setInput(e?.target?.value ?? '')}
                 onKeyDown={handleKeyDown}
-                placeholder={t('simulation.typeMessage')}
+                placeholder={isSpeechSupported
+                  ? (lang === 'tr' ? 'Yazın veya mikrofona tıklayın...' : 'Tippen oder Mikrofon klicken...')
+                  : t('simulation.typeMessage')
+                }
                 className="min-h-[48px] max-h-[120px] resize-none"
                 rows={1}
                 disabled={streaming}
               />
+              {isSpeechSupported && (
+                <Button
+                  onClick={() => {
+                    if (isListening) {
+                      stopListening();
+                    } else {
+                      toggleListening();
+                    }
+                  }}
+                  disabled={streaming}
+                  size="icon"
+                  variant={isListening ? 'destructive' : 'outline'}
+                  className={`h-12 w-12 shrink-0 transition-all ${isListening ? 'animate-pulse' : ''}`}
+                  title={isListening
+                    ? (lang === 'tr' ? 'Kaydı durdur' : 'Aufnahme stoppen')
+                    : (lang === 'tr' ? 'Sesle giriş' : 'Spracheingabe')
+                  }
+                >
+                  {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+              )}
               <Button
-                onClick={sendMessage}
+                onClick={() => {
+                  if (isListening) stopListening();
+                  sendMessage();
+                }}
                 disabled={streaming || !(input?.trim?.())}
                 size="icon"
                 className="h-12 w-12 shrink-0"
@@ -295,6 +377,14 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
                 <Send className="h-5 w-5" />
               </Button>
             </div>
+            {isSpeechSupported && !isListening && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Mic className="h-3 w-3" />
+                {lang === 'tr'
+                  ? 'Mikrofon düğmesine tıklayarak sesle yanıt verebilirsiniz'
+                  : 'Klicken Sie auf das Mikrofon, um mündlich zu antworten'}
+              </p>
+            )}
           </div>
         )}
       </div>
