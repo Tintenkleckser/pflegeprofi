@@ -86,3 +86,18 @@ model GlossaryTerm {
 
   @@map("glossary_terms")
 }
+
+model HandbookSection {
+  id          String   @id @default(uuid())
+  domain      String   @default("nursing")
+  partNumber  Int      @map("part_number")
+  sectionIdx  Int      @map("section_idx")
+  title       String   @db.Text
+  content     String   @db.Text
+  keywords    String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([domain])
+  @@index([partNumber])
+  @@map("handbook_sections")
+}

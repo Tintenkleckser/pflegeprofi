@@ -3,22 +3,7 @@ import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/db';
-
-const GLOSSARY_CONTEXT = `
-GLOSSAR (Deutsch - Türkisch):
-- Anamnese = Öykü alma
-- Schmerzskala = Ağrı skalası
-- Vitalzeichen = Vital bulgular
-- Blutdruck = Kan basıncı (tansiyon)
-- Puls = Nabız
-- Schmerzlokalisation = Ağrı lokalizasyonu
-- Schmerzcharakter = Ağrı karakteri
-- Vorerkrankungen = Önceki hastalıklar
-- Medikation = İlaç tedavisi
-- Allergie = Alerji
-- Mobilisation = Mobilizasyon
-- Dekubitus = Bası yarası
-`;
+import { retrieveHandbookContext } from '@/lib/handbook-rag';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,15 +37,40 @@ export async function POST(request: NextRequest) {
 
     const isBilingual = languageMode === 'bilingual';
 
+    // Retrieve glossary from DB for bilingual mode
+    let glossaryContext = '';
+    if (isBilingual) {
+      try {
+        const glossaryTerms = await prisma.glossaryTerm.findMany({
+          select: { termDe: true, termTr: true },
+          take: 20,
+        });
+        glossaryContext = `\nGLOSSAR (Deutsch - Türkisch):\n${glossaryTerms.map(t => `- ${t.termDe} = ${t.termTr}`).join('\n')}`;
+      } catch (e) {
+        // Fallback: continue without glossary
+      }
+    }
+
+    // RAG: Retrieve relevant handbook context based on the user message
+    let handbookContext = '';
+    try {
+      handbookContext = await retrieveHandbookContext(userMessage, template.domain ?? 'nursing', 3);
+    } catch (e) {
+      // Fallback: continue without handbook context
+    }
+
     // Build system prompt
     let systemPrompt = template.systemPrompt ?? '';
+    if (handbookContext) {
+      systemPrompt += `\n${handbookContext}`;
+    }
     systemPrompt += `\n\nSPRACHMODUS: ${isBilingual ? 'BILINGUAL' : 'GERMAN_ONLY'}\n`;
     if (isBilingual) {
       systemPrompt += `
 - Führe das Gespräch auf Deutsch.
 - Wenn der Kandidat etwas nicht versteht, erkläre es zusätzlich auf Türkisch in eckigen Klammern [TR: ...].
 - Gib Hinweise zweisprachig: Erst Deutsch, dann [TR: türkische Übersetzung].
-${GLOSSARY_CONTEXT}`;
+${glossaryContext}`;
     } else {
       systemPrompt += `\n- Führe das Gespräch ausschließlich auf Deutsch.\n- Antworte niemals auf Türkisch.\n`;
     }

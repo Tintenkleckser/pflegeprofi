@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/db';
+import { retrieveEvaluationContext } from '@/lib/handbook-rag';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +25,15 @@ export async function POST(request: NextRequest) {
 
     const isBilingual = languageMode === 'bilingual';
 
+    // RAG: Retrieve handbook context for evaluation
+    let handbookContext = '';
+    try {
+      const topicFromTemplate = template?.titleDe ?? template?.descriptionDe ?? '';
+      handbookContext = await retrieveEvaluationContext(topicFromTemplate, template?.domain ?? 'nursing');
+    } catch (e) {
+      // Continue without handbook context
+    }
+
     // Build evaluation prompt
     const conversationText = (messages ?? []).map((m: any) => {
       const role = m?.role === 'user' ? 'Kandidat' : 'Patient';
@@ -33,6 +43,7 @@ export async function POST(request: NextRequest) {
     const evaluationPrompt = `Du bist ein erfahrener Prüfer für die Pflegeexamensprüfung in Deutschland.
 
 Bewerte das folgende Anamnesegespräch eines Prüfungskandidaten.
+${handbookContext}
 
 GESPRÄCH:
 ${conversationText}
