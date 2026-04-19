@@ -5,12 +5,6 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS } from '@/lib/topic-categories';
-import OpenAI from 'openai';
-
-const client = new OpenAI({
-  apiKey: process.env.ABACUSAI_API_KEY,
-  baseURL: 'https://llmapi.abacus.ai/v1',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,14 +77,28 @@ WICHTIG:
 - Passe Komplexität an den Schwierigkeitsgrad an
 - Bei "Extrem": Baue mehrere Komplikationen, Zeitdruck und emotionale Herausforderungen ein`;
 
-    const response = await client.chat.completions.create({
-      model: 'gpt-5.4-mini',
-      messages: [{ role: 'user', content: generatePrompt }],
-      temperature: 0.8,
-      max_tokens: 2000,
+    const llmResponse = await fetch('https://apps.abacus.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-5.4-mini',
+        messages: [{ role: 'user', content: generatePrompt }],
+        temperature: 0.8,
+        max_tokens: 2000,
+      }),
     });
 
-    const content = response.choices?.[0]?.message?.content ?? '';
+    if (!llmResponse.ok) {
+      const errText = await llmResponse.text().catch(() => 'Unknown error');
+      console.error('LLM API error:', llmResponse.status, errText);
+      return NextResponse.json({ error: 'LLM-API-Fehler. Bitte versuchen Sie es erneut.' }, { status: 502 });
+    }
+
+    const llmData = await llmResponse.json();
+    const content = llmData?.choices?.[0]?.message?.content ?? '';
     
     // Parse JSON from response (handle potential markdown wrapping)
     let parsed;
