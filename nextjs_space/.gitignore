@@ -37,5 +37,4 @@ prisma/migrations/
 tsconfig.tsbuildinfo
 
 # Abacus symlinks
-package.json
-yarn.lock
+node_modules/
