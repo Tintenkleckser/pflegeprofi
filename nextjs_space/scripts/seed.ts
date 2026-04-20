@@ -1,20 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Seed test user
-  const passwordHash = await bcrypt.hash('johndoe123', 12);
-  await prisma.user.upsert({
-    where: { email: 'john@doe.com' },
-    update: {},
-    create: {
-      email: 'john@doe.com',
-      passwordHash,
-      nativeLanguage: 'tr',
-    },
-  });
+  // Note: Users are now managed by Supabase Auth.
+  // Profiles are auto-created on first login via getAuthUser().
 
   // Seed simulation template
   const templateId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';

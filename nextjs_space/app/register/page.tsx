@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
@@ -30,26 +30,27 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res?.json?.();
-      if (!res?.ok) {
-        setError(data?.error ?? 'Registrierung fehlgeschlagen');
-        return;
-      }
-      const result = await signIn('credentials', {
+      const supabase = createClient();
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        redirect: false,
       });
-      if (result?.error) {
-        setError(result?.error);
-      } else {
-        router.replace('/dashboard');
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
       }
+      // Auto-login after signup
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        // Signup succeeded but login failed - user may need to confirm email
+        setError('Registrierung erfolgreich! Bitte bestätigen Sie Ihre E-Mail-Adresse.');
+        return;
+      }
+      router.replace('/dashboard');
+      router.refresh();
     } catch (err: any) {
       setError('Registrierung fehlgeschlagen');
     } finally {
@@ -136,8 +137,8 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full" loading={loading}>
-                {t('common.register')}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Wird registriert...' : t('common.register')}
               </Button>
             </form>
             <div className="mt-4 text-center text-sm text-muted-foreground">

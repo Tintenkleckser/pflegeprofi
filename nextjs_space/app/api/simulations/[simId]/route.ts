@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 
 export async function GET(
@@ -10,11 +9,10 @@ export async function GET(
 ) {
   try {
     const { simId } = await params;
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id;
+    const user = await getAuthUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const simulation = await prisma.userSimulation.findFirst({
-      where: { id: simId ?? '', userId },
+      where: { id: simId ?? '', userId: user.id },
       include: {
         template: true,
         interactions: { orderBy: { turnNumber: 'asc' } },

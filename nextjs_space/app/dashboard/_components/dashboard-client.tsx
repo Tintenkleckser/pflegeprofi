@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/app-header';
@@ -35,7 +35,7 @@ interface SimHistory {
 
 export function DashboardClient() {
   const { t, i18n } = useTranslation();
-  const { data: session } = useSession() || {};
+  const { user } = useAuth();
   const router = useRouter();
   const [templates, setTemplates] = useState<SimTemplate[]>([]);
   const [history, setHistory] = useState<SimHistory[]>([]);

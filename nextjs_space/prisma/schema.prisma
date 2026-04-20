@@ -9,15 +9,14 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model User {
+model Profile {
   id             String           @id @default(uuid())
   email          String           @unique
-  passwordHash   String           @map("password_hash")
   nativeLanguage String           @default("tr") @map("native_language")
   createdAt      DateTime         @default(now()) @map("created_at")
   simulations    UserSimulation[]
 
-  @@map("users")
+  @@map("profiles")
 }
 
 model SimulationTemplate {
@@ -47,7 +46,7 @@ model UserSimulation {
   documentation  String?                 @db.Text
   startedAt      DateTime                @default(now()) @map("started_at")
   completedAt    DateTime?               @map("completed_at")
-  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           Profile                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   template       SimulationTemplate      @relation(fields: [templateId], references: [id])
   interactions   SimulationInteraction[]
   evaluation     Evaluation?

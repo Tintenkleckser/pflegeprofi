@@ -1,14 +1,13 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const user = await getAuthUser();
+    if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 

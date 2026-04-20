@@ -1,6 +1,6 @@
 'use client';
 import { useTranslation } from 'react-i18next';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 export function AppHeader() {
   const { t } = useTranslation();
-  const { data: session } = useSession() || {};
+  const { user, signOut } = useAuth();
   const router = useRouter();
 
   return (
@@ -20,7 +20,7 @@ export function AppHeader() {
           <span className="font-display text-lg font-bold tracking-tight">{t('common.appName')}</span>
         </Link>
         <nav className="flex items-center gap-1">
-          {session?.user && (
+          {user && (
             <>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/dashboard" className="gap-2">
@@ -37,11 +37,11 @@ export function AppHeader() {
             </>
           )}
           <LanguageSwitcher />
-          {session?.user && (
+          {user && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => signOut()}
               className="gap-2 text-muted-foreground"
             >
               <LogOut className="h-4 w-4" />

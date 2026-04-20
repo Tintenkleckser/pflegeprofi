@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import Link from 'next/link';
@@ -25,15 +25,18 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const result = await signIn('credentials', {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        redirect: false,
       });
-      if (result?.error) {
-        setError(t('common.error') + ': ' + (result?.error ?? 'Anmeldung fehlgeschlagen'));
+      if (signInError) {
+        setError(signInError.message === 'Invalid login credentials'
+          ? 'Ungültige Anmeldedaten'
+          : signInError.message);
       } else {
         router.replace('/dashboard');
+        router.refresh();
       }
     } catch (err: any) {
       setError('Anmeldung fehlgeschlagen');
@@ -104,8 +107,8 @@ export default function LoginPage() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full" loading={loading}>
-                {t('common.login')}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Wird angemeldet...' : t('common.login')}
               </Button>
             </form>
             <div className="mt-4 text-center text-sm text-muted-foreground">
