@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { simId, templateId, languageMode, messages } = body ?? {};
+    const { simId, templateId, languageMode, messages, documentation } = body ?? {};
 
     if (!simId) {
       return NextResponse.json({ error: 'simId required' }, { status: 400 });
@@ -23,45 +23,91 @@ export async function POST(request: NextRequest) {
       where: { id: templateId },
     });
 
-    const isBilingual = languageMode === 'bilingual';
+    const sim = await prisma.userSimulation.findUnique({
+      where: { id: simId },
+    });
 
-    // RAG: Retrieve handbook context for evaluation
+    const isBilingual = languageMode === 'bilingual';
+    const simType = template?.type || 'oral_exam';
+    const checklist = (template?.checklist as any[]) || [];
+    const hasChecklist = checklist.length > 0;
+    const hasDocumentation = !!(documentation || sim?.documentation);
+    const docText = documentation || sim?.documentation || '';
+    const requiresDoc = simType === 'patient_conversation' || simType === 'written_task';
+
+    // RAG context
     let handbookContext = '';
     try {
       const topicFromTemplate = template?.titleDe ?? template?.descriptionDe ?? '';
       handbookContext = await retrieveEvaluationContext(topicFromTemplate, template?.domain ?? 'nursing');
-    } catch (e) {
-      // Continue without handbook context
-    }
+    } catch (e) { /* continue */ }
 
-    // Build evaluation prompt
+    // Build conversation text
     const conversationText = (messages ?? []).map((m: any) => {
-      const role = m?.role === 'user' ? 'Kandidat' : 'Patient';
+      const role = m?.role === 'user' ? 'Kandidat' : (simType === 'patient_conversation' ? 'Patient' : 'Prüfer');
       return `${role}: ${m?.content ?? ''}`;
     }).join('\n');
 
+    // Build checklist section for prompt
+    let checklistPromptSection = '';
+    if (hasChecklist) {
+      checklistPromptSection = `\nCHECKLISTE - Bewerte JEDEN Punkt einzeln:\n${checklist.map((item: any, i: number) => 
+        `${i + 1}. [ID: ${item.id}] ${item.textDe} (Kategorie: ${item.category}, Gewichtung: ${item.weight === 3 ? 'KRITISCH' : item.weight === 2 ? 'Wichtig' : 'Normal'})`
+      ).join('\n')}\n`;
+    }
+
+    // Type-specific evaluation instructions
+    const typeInstructions: Record<string, string> = {
+      patient_conversation: `WICHTIG FÜR PATIENTENGESPRÄCH:
+- Medizinische Fachsprache gegenüber dem Patienten ist ein FEHLER und muss negativ bewertet werden.
+- Bewerte stattdessen: Verständliche Sprache, aktives Zuhören, Empathie, Informationserhebung.
+- Prüfe, ob der Kandidat Auffälligkeiten des Patienten (z.B. Ängstlichkeit, kognitive Ausfälle, Depression) erkannt hat.
+- Falls Dokumentation vorhanden: Bewerte Vollständigkeit und ob erkannte Auffälligkeiten dokumentiert wurden.`,
+      oral_exam: `WICHTIG FÜR MÜNDLICHE PRÜFUNG:
+- Medizinische Fachsprache ist ERWÜNSCHT und wird positiv bewertet.
+- Bewerte: Fachwissen, korrekte Terminologie, logische Argumentation, Vollständigkeit.`,
+      written_task: `WICHTIG FÜR SCHRIFTLICHE AUFGABE:
+- Medizinische Fachsprache ist ERWÜNSCHT und wird positiv bewertet.
+- Bewerte: Strukturierte Dokumentation, Fachterminologie, Pflegeplanung, Vollständigkeit.
+- Falls Dokumentation vorhanden: Bewerte Struktur, Fachbegriffe und Vollständigkeit.`,
+    };
+
+    // Documentation section
+    let docPromptSection = '';
+    if (requiresDoc && hasDocumentation) {
+      docPromptSection = `\n\nVOM KANDIDATEN ERSTELLTE DOKUMENTATION:\n---\n${docText}\n---\nBewerte die Dokumentation auf: Vollständigkeit, korrekte Fachsprache, Struktur, ob alle relevanten Beobachtungen und Maßnahmen enthalten sind.`;
+    } else if (requiresDoc && !hasDocumentation) {
+      docPromptSection = `\n\nHINWEIS: Der Kandidat hat KEINE Dokumentation erstellt. Dies ist ein erheblicher Mangel und muss in der Bewertung berücksichtigt werden.`;
+    }
+
     const evaluationPrompt = `Du bist ein erfahrener Prüfer für die Pflegeexamensprüfung in Deutschland.
 
-Bewerte das folgende Anamnesegespräch eines Prüfungskandidaten.
+Simulationstyp: ${simType === 'patient_conversation' ? 'Patientengespräch' : simType === 'oral_exam' ? 'Mündliche Prüfung' : 'Schriftliche Aufgabe'}
+Aufgabenstellung: ${template?.descriptionDe || ''}
+
+${typeInstructions[simType] || ''}
 ${handbookContext}
+${checklistPromptSection}
 
 GESPRÄCH:
 ${conversationText}
-
-BEWERTUNGSKRITERIEN:
-1. Fachsprache (1-10): Korrekte Verwendung medizinischer/pflegerischer Fachbegriffe
-2. Struktur (1-10): Logischer und systematischer Aufbau des Anamnesegesprächs
-3. Empathie (1-10): Einfühlsame und patientenorientierte Gesprächsführung
+${docPromptSection}
 
 Gib deine Bewertung im folgenden JSON-Format zurück:
 {
+  "checklistResults": [
+    ${hasChecklist ? checklist.map((item: any) => `{"id": "${item.id}", "fulfilled": true/false, "score": 0-10, "commentDe": "Kurzer Kommentar", "commentTr": "${isBilingual ? 'Kısa yorum' : ''}"}`).join(',\n    ') : '[]'}
+  ],
   "scores": {
-    "fachsprache": <1-10>,
-    "struktur": <1-10>,
-    "empathie": <1-10>
+    ${simType === 'patient_conversation'
+      ? '"verstaendlichkeit": <1-10>,\n    "informationserhebung": <1-10>,\n    "empathie": <1-10>,\n    "beobachtung": <1-10>'
+      : '"fachsprache": <1-10>,\n    "struktur": <1-10>,\n    "fachwissen": <1-10>'}
   },
-  "feedback_de": "<Ausführliches Feedback auf Deutsch, 3-5 Sätze>",
-  "feedback_tr": "<${isBilingual ? 'Aynı geri bildirimin Türkçe çevirisi, 3-5 cümle' : 'Leerer String'}>"
+  ${requiresDoc ? `"docScore": ${hasDocumentation ? '<1-10>' : '0'},
+  "docFeedbackDe": "${hasDocumentation ? 'Feedback zur Dokumentation' : 'Keine Dokumentation erstellt. Dies ist ein erheblicher Mangel.'}",
+  "docFeedbackTr": "${isBilingual ? (hasDocumentation ? 'Dokümantasyon hakkında geri bildirim' : 'Dokümantasyon oluşturulmadı. Bu önemli bir eksikliktir.') : ''}",` : ''}
+  "feedback_de": "Ausführliches Feedback auf Deutsch (5-8 Sätze). Gehe auf die Checklisten-Ergebnisse ein.",
+  "feedback_tr": "${isBilingual ? 'Aynı geri bildirimin Türkçe çevirisi, 5-8 cümle' : ''}"
 }
 
 Respond with raw JSON only. Do not include code blocks, markdown, or any other formatting.`;
@@ -78,7 +124,7 @@ Respond with raw JSON only. Do not include code blocks, markdown, or any other f
           { role: 'system', content: 'Du bist ein Prüfungsbewerter. Antworte ausschließlich mit validem JSON.' },
           { role: 'user', content: evaluationPrompt },
         ],
-        max_tokens: 1500,
+        max_tokens: 3000,
         temperature: 0.3,
         response_format: { type: 'json_object' },
       }),
@@ -99,9 +145,10 @@ Respond with raw JSON only. Do not include code blocks, markdown, or any other f
     } catch (e: any) {
       console.error('Failed to parse evaluation JSON:', rawContent);
       evalResult = {
+        checklistResults: [],
         scores: { fachsprache: 5, struktur: 5, empathie: 5 },
         feedback_de: 'Bewertung konnte nicht korrekt generiert werden.',
-        feedback_tr: 'Değerlendirme doğru bir şekilde oluşturulamadı.',
+        feedback_tr: isBilingual ? 'Değerlendirme doğru bir şekilde oluşturulamadı.' : '',
       };
     }
 
@@ -112,12 +159,20 @@ Respond with raw JSON only. Do not include code blocks, markdown, or any other f
         feedbackDe: evalResult?.feedback_de ?? '',
         feedbackTr: evalResult?.feedback_tr ?? '',
         scores: evalResult?.scores ?? {},
+        checklistResults: evalResult?.checklistResults ?? [],
+        docFeedbackDe: evalResult?.docFeedbackDe ?? null,
+        docFeedbackTr: evalResult?.docFeedbackTr ?? null,
+        docScore: evalResult?.docScore != null ? Number(evalResult.docScore) : null,
       },
       create: {
         simulationId: simId,
         feedbackDe: evalResult?.feedback_de ?? '',
         feedbackTr: evalResult?.feedback_tr ?? '',
         scores: evalResult?.scores ?? {},
+        checklistResults: evalResult?.checklistResults ?? [],
+        docFeedbackDe: evalResult?.docFeedbackDe ?? null,
+        docFeedbackTr: evalResult?.docFeedbackTr ?? null,
+        docScore: evalResult?.docScore != null ? Number(evalResult.docScore) : null,
       },
     });
 

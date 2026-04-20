@@ -52,6 +52,26 @@ export async function POST(request: NextRequest) {
 
     const maxTurns = difficulty === 'beginner' ? 6 : difficulty === 'intermediate' ? 8 : difficulty === 'advanced' ? 10 : 12;
 
+    const checklistGuidance: Record<string, string> = {
+      patient_conversation: `CHECKLISTE FÜR PATIENTENGESPRÄCH:
+- WICHTIG: Medizinische Fachsprache ist im Patientengespräch ein FEHLER. Der Patient versteht keine Fachbegriffe.
+- Die Checkliste soll prüfen: Verständliche Sprache, aktives Zuhören, Empathie, vollständige Informationserhebung.
+- Baue subtile Auffälligkeiten beim Patienten ein (z.B. Ängstlichkeit, Vergesslichkeit, kognitive Ausfälle, Hinweise auf Verwahrlosung, Depression), 
+  die der Kandidat erkennen und ggf. dem behandelnden Arzt mitteilen sollte.
+- Checklist-Items sollen auch prüfen, ob der Kandidat diese Auffälligkeiten bemerkt hat.
+- Füge ein Item hinzu: "Dokumentation erstellt" (wird separat bewertet).`,
+      oral_exam: `CHECKLISTE FÜR MÜNDLICHE PRÜFUNG:
+- Medizinische Fachsprache ist ERWÜNSCHT und NOTWENDIG.
+- Die Checkliste soll Fachwissen, korrekte Terminologie, logische Argumentation und Vollständigkeit prüfen.
+- Füge spezifische Fachfragen ein, die der Kandidat beantworten sollte.`,
+      written_task: `CHECKLISTE FÜR SCHRIFTLICHE AUFGABE:
+- Medizinische Fachsprache ist ERWÜNSCHT und NOTWENDIG.
+- Die Checkliste soll Struktur, Vollständigkeit, korrekte Fachbegriffe und Pflegeplanung prüfen.
+- Füge ein Item hinzu: "Dokumentation erstellt" (wird separat bewertet).`,
+    };
+
+    const requiresDocumentation = simulationType === 'patient_conversation' || simulationType === 'written_task';
+
     const generatePrompt = `Du bist ein Experte für die Erstellung von Pflegeprüfungs-Simulationen für ausländische Pflegekräfte in Deutschland.
 
 Erstelle ein realistisches Prüfungsszenario zum Thema "${topic.titleDe}" (${topic.descriptionDe}).
@@ -60,19 +80,32 @@ Typ: ${typeLabels[simulationType] || simulationType}
 Schwierigkeitsgrad: ${difficultyInstructions[difficulty] || difficulty}
 ${handbookContext ? `\n${handbookContext}\n` : ''}
 
+${checklistGuidance[simulationType] || ''}
+
 Antworte AUSSCHLIESSLICH als valides JSON mit folgender Struktur (KEINE Markdown-Codeblöcke, KEIN Text davor/danach):
 {
   "titleDe": "Kurzer, prägnanter Titel auf Deutsch",
   "titleTr": "Gleicher Titel auf Türkisch",
   "descriptionDe": "Ausführliche Aufgabenstellung (3-5 Sätze) auf Deutsch. Beschreibe die Situation, den Patienten und die Erwartungen.",
   "descriptionTr": "Gleiche Aufgabenstellung auf Türkisch",
-  "systemPrompt": "Detaillierte Rollenanweisung für den KI-Prüfer/Patienten. Beschreibe: Name, Alter, Vorgeschichte, Beschwerden, Persönlichkeit, Gesprächsverhalten. Mindestens 200 Wörter.",
-  "evaluationCriteria": ["Fachsprache", "Kommunikation", "Pflegefachwissen", "Empathie", "Problemlösung"]
+  "systemPrompt": "Detaillierte Rollenanweisung für den KI-Prüfer/Patienten. Beschreibe: Name, Alter, Vorgeschichte, Beschwerden, Persönlichkeit, Gesprächsverhalten. Mindestens 200 Wörter.${simulationType === 'patient_conversation' ? ' Baue subtile Auffälligkeiten ein (z.B. Ängstlichkeit, Vergesslichkeit, beginnende Demenz, Depression), die ein aufmerksamer Pfleger erkennen sollte.' : ''}",
+  "evaluationCriteria": ["Kriterium1", "Kriterium2", ...],
+  "checklist": [
+    {"id": "1", "textDe": "Beschreibung der Aufgabe auf Deutsch", "textTr": "Türkische Übersetzung", "category": "Kategorie", "weight": 1-3},
+    ...
+  ]
 }
+
+CHECKLIST-REGELN:
+- Erstelle 8-15 spezifische, überprüfbare Checklist-Items
+- Jedes Item hat: id (String), textDe, textTr, category (z.B. "Kommunikation", "Fachwissen", "Beobachtung", "Dokumentation"), weight (1=normal, 2=wichtig, 3=kritisch)
+- Die Items müssen SPEZIFISCH zum Szenario passen, nicht generisch sein
+${requiresDocumentation ? '- Füge mindestens ein Item der Kategorie "Dokumentation" hinzu' : ''}
+- Bei Patientengesprächen: Items für das Erkennen von Auffälligkeiten mit weight=3
 
 WICHTIG:
 - Das Szenario muss realistisch und prüfungsrelevant sein
-- Verwende echte medizinische Fachbegriffe
+- Verwende echte medizinische Fachbegriffe im systemPrompt
 - Der systemPrompt muss sehr detailliert sein, damit die KI die Rolle überzeugend spielen kann
 - Passe Komplexität an den Schwierigkeitsgrad an
 - Bei "Extrem": Baue mehrere Komplikationen, Zeitdruck und emotionale Herausforderungen ein`;
@@ -122,6 +155,7 @@ WICHTIG:
         descriptionTr: parsed.descriptionTr || topic.descriptionTr,
         systemPrompt: parsed.systemPrompt || '',
         evaluationCriteria: parsed.evaluationCriteria || ['Fachsprache', 'Kommunikation', 'Pflegefachwissen', 'Empathie'],
+        checklist: parsed.checklist || [],
         maxTurns,
       },
     });

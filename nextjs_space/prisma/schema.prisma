@@ -31,6 +31,7 @@ model SimulationTemplate {
   descriptionTr      String           @map("description_tr") @db.Text
   systemPrompt       String           @map("system_prompt") @db.Text
   evaluationCriteria Json             @default("[]") @map("evaluation_criteria")
+  checklist          Json             @default("[]")
   maxTurns           Int              @default(8) @map("max_turns")
   simulations        UserSimulation[]
 
@@ -38,17 +39,18 @@ model SimulationTemplate {
 }
 
 model UserSimulation {
-  id           String                  @id @default(uuid())
-  userId       String                  @map("user_id")
-  templateId   String                  @map("template_id")
-  status       String                  @default("in_progress")
-  languageMode String                  @default("bilingual") @map("language_mode")
-  startedAt    DateTime                @default(now()) @map("started_at")
-  completedAt  DateTime?               @map("completed_at")
-  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template     SimulationTemplate      @relation(fields: [templateId], references: [id])
-  interactions SimulationInteraction[]
-  evaluation   Evaluation?
+  id             String                  @id @default(uuid())
+  userId         String                  @map("user_id")
+  templateId     String                  @map("template_id")
+  status         String                  @default("in_progress")
+  languageMode   String                  @default("bilingual") @map("language_mode")
+  documentation  String?                 @db.Text
+  startedAt      DateTime                @default(now()) @map("started_at")
+  completedAt    DateTime?               @map("completed_at")
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template       SimulationTemplate      @relation(fields: [templateId], references: [id])
+  interactions   SimulationInteraction[]
+  evaluation     Evaluation?
 
   @@map("user_simulations")
 }
@@ -66,13 +68,17 @@ model SimulationInteraction {
 }
 
 model Evaluation {
-  id           String         @id @default(uuid())
-  simulationId String         @unique @map("simulation_id")
-  feedbackDe   String         @map("feedback_de") @db.Text
-  feedbackTr   String         @map("feedback_tr") @db.Text
-  scores       Json           @default("{}")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  simulation   UserSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  simulationId     String         @unique @map("simulation_id")
+  feedbackDe       String         @map("feedback_de") @db.Text
+  feedbackTr       String         @map("feedback_tr") @db.Text
+  scores           Json           @default("{}")
+  checklistResults Json           @default("[]") @map("checklist_results")
+  docFeedbackDe    String?        @map("doc_feedback_de") @db.Text
+  docFeedbackTr    String?        @map("doc_feedback_tr") @db.Text
+  docScore         Int?           @map("doc_score")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  simulation       UserSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
 
   @@map("evaluations")
 }

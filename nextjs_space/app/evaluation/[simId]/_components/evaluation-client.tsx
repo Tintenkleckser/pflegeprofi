@@ -7,19 +7,32 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-import { Trophy, ArrowLeft, RotateCcw, MessageSquare, Award, TrendingUp } from 'lucide-react';
+import { Trophy, ArrowLeft, RotateCcw, MessageSquare, Award, TrendingUp, CheckCircle2, XCircle, ClipboardList, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+interface ChecklistResult {
+  id: string;
+  fulfilled: boolean;
+  score: number;
+  commentDe: string;
+  commentTr: string;
+}
 
 interface EvalData {
   id: string;
   status: string;
-  template: { titleDe: string; titleTr: string };
+  templateId?: string;
+  template: { titleDe: string; titleTr: string; type: string; checklist: any[] };
   evaluation: {
     feedbackDe: string;
     feedbackTr: string;
     scores: Record<string, number>;
+    checklistResults: ChecklistResult[];
+    docFeedbackDe: string | null;
+    docFeedbackTr: string | null;
+    docScore: number | null;
   } | null;
+  documentation: string | null;
   interactions: Array<{ userInput: string; aiResponse: string; turnNumber: number }>;
 }
 
@@ -58,9 +71,31 @@ export function EvaluationClient({ simId }: { simId: string }) {
 
   const scores = data?.evaluation?.scores ?? {};
   const scoreKeys = Object.keys(scores ?? {});
-  const avgScore = scoreKeys?.length > 0
-    ? (Object.values(scores ?? {}).reduce((a: any, b: any) => (Number(a)||0) + (Number(b)||0), 0) as number) / scoreKeys.length
-    : 0;
+  const checklistResults = data?.evaluation?.checklistResults ?? [];
+  const checklist = data?.template?.checklist ?? [];
+  const hasChecklist = checklistResults.length > 0;
+  const docScore = data?.evaluation?.docScore;
+  const hasDoc = data?.documentation != null && data.documentation.length > 0;
+  const simType = data?.template?.type || 'oral_exam';
+
+  // Calculate overall score from checklist if available
+  let avgScore = 0;
+  if (hasChecklist) {
+    const totalWeight = checklist.reduce((sum: number, item: any) => sum + (item.weight || 1), 0);
+    const weightedScore = checklistResults.reduce((sum: number, r: ChecklistResult) => {
+      const matchingItem = checklist.find((c: any) => c.id === r.id);
+      const weight = matchingItem?.weight || 1;
+      return sum + (r.score / 10) * weight;
+    }, 0);
+    avgScore = totalWeight > 0 ? (weightedScore / totalWeight) * 10 : 0;
+  } else if (scoreKeys.length > 0) {
+    avgScore = (Object.values(scores).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0) as number) / scoreKeys.length;
+  }
+
+  // Include doc score in overall if applicable
+  if (docScore != null) {
+    avgScore = (avgScore * 0.7) + (docScore * 0.3);
+  }
 
   const getScoreColor = (score: number): string => {
     if (score >= 8) return 'text-green-600';
@@ -78,7 +113,26 @@ export function EvaluationClient({ simId }: { simId: string }) {
     fachsprache: { de: 'Fachsprache', tr: 'Tıbbi Terminoloji' },
     struktur: { de: 'Struktur', tr: 'Yapı' },
     empathie: { de: 'Empathie', tr: 'Empati' },
+    fachwissen: { de: 'Fachwissen', tr: 'Uzmanlık Bilgisi' },
+    verstaendlichkeit: { de: 'Verständlichkeit', tr: 'Anlaşılırlık' },
+    informationserhebung: { de: 'Informationserhebung', tr: 'Bilgi Toplama' },
+    beobachtung: { de: 'Beobachtung & Erkennung', tr: 'Gözlem & Tanıma' },
   };
+
+  // Group checklist by category
+  const checklistByCategory: Record<string, { item: any; result: ChecklistResult }[]> = {};
+  if (hasChecklist) {
+    checklist.forEach((item: any) => {
+      const result = checklistResults.find((r: ChecklistResult) => r.id === item.id);
+      if (!result) return;
+      const cat = item.category || 'Sonstiges';
+      if (!checklistByCategory[cat]) checklistByCategory[cat] = [];
+      checklistByCategory[cat].push({ item, result });
+    });
+  }
+
+  const fulfilledCount = checklistResults.filter(r => r.fulfilled).length;
+  const totalCount = checklistResults.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +154,7 @@ export function EvaluationClient({ simId }: { simId: string }) {
           {/* Overall Score */}
           <Card className="mb-6 border-primary/20">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-6">
                 <div className="h-20 w-20 rounded-full border-4 border-primary/20 flex items-center justify-center">
                   <span className={`text-3xl font-bold ${getScoreColor(avgScore)}`}>
                     {avgScore?.toFixed?.(1) ?? '0'}
@@ -109,10 +163,81 @@ export function EvaluationClient({ simId }: { simId: string }) {
                 <div>
                   <p className="font-display font-semibold text-lg">{t('evaluation.overall')}</p>
                   <p className="text-sm text-muted-foreground">{t('evaluation.outOf')}</p>
+                  {hasChecklist && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {lang === 'tr' ? 'Kontrol listesi' : 'Checkliste'}: {fulfilledCount}/{totalCount} {lang === 'tr' ? 'tamamlandı' : 'erfüllt'}
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Checklist Results */}
+          {hasChecklist && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ClipboardList className="h-5 w-5 text-primary" />
+                  {lang === 'tr' ? 'Kontrol Listesi Sonuçları' : 'Checklisten-Ergebnisse'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {Object.entries(checklistByCategory).map(([category, items]) => (
+                  <div key={category}>
+                    <h4 className="text-sm font-semibold text-foreground/80 mb-3 flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      {category}
+                    </h4>
+                    <div className="space-y-2">
+                      {items.map(({ item, result }) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border ${
+                            result.fulfilled
+                              ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                              : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                          }`}
+                        >
+                          <div className="shrink-0 mt-0.5">
+                            {result.fulfilled
+                              ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                              : <XCircle className="h-5 w-5 text-red-500" />
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium">
+                                {lang === 'tr' ? item.textTr : item.textDe}
+                              </span>
+                              {item.weight >= 3 && (
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                  {lang === 'tr' ? 'Kritik' : 'Kritisch'}
+                                </Badge>
+                              )}
+                              {item.weight === 2 && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {lang === 'tr' ? 'Önemli' : 'Wichtig'}
+                                </Badge>
+                              )}
+                              <span className={`text-xs font-bold ml-auto ${getScoreColor(result.score)}`}>
+                                {result.score}/10
+                              </span>
+                            </div>
+                            {result.commentDe && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {lang === 'tr' ? (result.commentTr || result.commentDe) : result.commentDe}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Individual Scores */}
           <Card className="mb-6">
@@ -146,6 +271,64 @@ export function EvaluationClient({ simId }: { simId: string }) {
             </CardContent>
           </Card>
 
+          {/* Documentation Evaluation */}
+          {(docScore != null || (simType !== 'oral_exam' && data?.documentation)) && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5 text-primary" />
+                  {lang === 'tr' ? 'Dokümantasyon Değerlendirmesi' : 'Dokumentations-Bewertung'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {docScore != null && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">
+                        {lang === 'tr' ? 'Dokümantasyon Puanı' : 'Dokumentations-Score'}
+                      </span>
+                      <span className={`text-sm font-bold ${getScoreColor(docScore)}`}>{docScore}/10</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${docScore * 10}%` }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className={`h-full rounded-full ${getProgressColor(docScore)}`}
+                      />
+                    </div>
+                  </div>
+                )}
+                {data?.evaluation?.docFeedbackDe && (
+                  <div className="mt-3">
+                    <Tabs defaultValue="de">
+                      <TabsList className="mb-2">
+                        <TabsTrigger value="de">Deutsch</TabsTrigger>
+                        <TabsTrigger value="tr">Türkçe</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="de">
+                        <p className="text-sm leading-relaxed">{data.evaluation.docFeedbackDe}</p>
+                      </TabsContent>
+                      <TabsContent value="tr">
+                        <p className="text-sm leading-relaxed">{data.evaluation?.docFeedbackTr || 'Geri bildirim mevcut değil.'}</p>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )}
+                {hasDoc && (
+                  <details className="mt-2">
+                    <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground">
+                      {lang === 'tr' ? 'Gönderilen dokümantasyonu göster' : 'Eingereichte Dokumentation anzeigen'}
+                    </summary>
+                    <div className="mt-2 p-3 bg-muted rounded-lg">
+                      <pre className="text-xs whitespace-pre-wrap">{data?.documentation}</pre>
+                    </div>
+                  </details>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Feedback */}
           <Card className="mb-6">
             <CardHeader>
@@ -176,7 +359,7 @@ export function EvaluationClient({ simId }: { simId: string }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  Gesprächsverlauf
+                  {lang === 'tr' ? 'Konuşma Geçmişi' : 'Gesprächsverlauf'}
                 </CardTitle>
               </CardHeader>
               <CardContent>

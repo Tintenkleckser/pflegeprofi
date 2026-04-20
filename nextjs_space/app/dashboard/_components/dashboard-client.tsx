@@ -247,7 +247,7 @@ export function DashboardClient() {
                       <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                         {lang === 'tr' ? tmpl?.descriptionTr : tmpl?.descriptionDe}
                       </p>
-                      <Button className="gap-2 w-full group-hover:bg-primary/90" size="sm">
+                      <Button className="gap-2 w-full group-hover:bg-primary/90" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/simulation/${tmpl?.id}/briefing`); }}>
                         <Play className="h-4 w-4" />
                         {t('common.startSimulation')}
                       </Button>

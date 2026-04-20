@@ -6,14 +6,15 @@ import { prisma } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { simId: string } }
+  { params }: { params: Promise<{ simId: string }> }
 ) {
   try {
+    const { simId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const userId = (session.user as any)?.id;
     const simulation = await prisma.userSimulation.findFirst({
-      where: { id: params?.simId ?? '', userId },
+      where: { id: simId ?? '', userId },
       include: {
         template: true,
         interactions: { orderBy: { turnNumber: 'asc' } },

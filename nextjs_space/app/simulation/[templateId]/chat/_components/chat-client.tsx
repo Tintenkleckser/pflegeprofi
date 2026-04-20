@@ -4,17 +4,25 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { GlossaryTooltip } from '@/components/glossary-tooltip';
-import { Send, User, Stethoscope, Loader2, CheckCircle2, Mic, MicOff, Volume2 } from 'lucide-react';
+import { Send, User, Stethoscope, Loader2, CheckCircle2, Mic, MicOff, ChevronDown, ChevronUp, FileText, ClipboardList, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface ChecklistItem {
+  id: string;
+  textDe: string;
+  textTr: string;
+  category: string;
+  weight: number;
 }
 
 export function ChatClient({ templateId, simId }: { templateId: string; simId: string }) {
@@ -26,8 +34,14 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
   const [streaming, setStreaming] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const [maxTurns, setMaxTurns] = useState(8);
-  const [simStatus, setSimStatus] = useState<'active' | 'evaluating' | 'completed'>('active');
+  const [simStatus, setSimStatus] = useState<'active' | 'documenting' | 'evaluating' | 'completed'>('active');
   const [languageMode, setLanguageMode] = useState('bilingual');
+  const [templateData, setTemplateData] = useState<any>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(true);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [documentation, setDocumentation] = useState('');
+  const [docSaving, setDocSaving] = useState(false);
+  const [requiresDoc, setRequiresDoc] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -52,14 +66,9 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
     },
   });
 
-  // Update input with interim transcript for visual feedback
   useEffect(() => {
     if (isListening && speechTranscript) {
-      setInput((prev: string) => {
-        // Only update if the transcript has new final content
-        const base = prev.replace(/\s*$/, '');
-        return speechTranscript;
-      });
+      setInput(speechTranscript);
     }
   }, [speechTranscript, isListening]);
 
@@ -69,7 +78,15 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
         const res = await fetch(`/api/simulations/${simId}`);
         const data = await res?.json?.();
         if (data?.languageMode) setLanguageMode(data.languageMode);
-        if (data?.template?.maxTurns) setMaxTurns(data.template.maxTurns);
+        if (data?.template) {
+          setTemplateData(data.template);
+          if (data.template.maxTurns) setMaxTurns(data.template.maxTurns);
+          const cl = data.template.checklist;
+          if (Array.isArray(cl) && cl.length > 0) setChecklistItems(cl);
+          const simType = data.template.type;
+          setRequiresDoc(simType === 'patient_conversation' || simType === 'written_task');
+        }
+        if (data?.documentation) setDocumentation(data.documentation);
         const existingMessages: Message[] = (data?.interactions ?? []).flatMap((i: any) => [
           { role: 'user' as const, content: i?.userInput ?? '' },
           { role: 'assistant' as const, content: i?.aiResponse ?? '' },
@@ -119,9 +136,7 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
         }),
       });
 
-      if (!res?.ok) {
-        throw new Error('Stream request failed');
-      }
+      if (!res?.ok) throw new Error('Stream request failed');
 
       const reader = res.body?.getReader?.();
       const decoder = new TextDecoder();
@@ -153,34 +168,17 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
                   return updated;
                 });
               }
-            } catch (e: any) {
-              // skip
-            }
+            } catch (e: any) { /* skip */ }
           }
         }
       }
 
-      // If last turn, trigger evaluation
+      // After last turn, go to documentation phase or evaluate
       if (isLastTurn) {
-        setSimStatus('evaluating');
-        try {
-          const evalRes = await fetch('/api/simulation/evaluate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              simId,
-              templateId,
-              languageMode,
-              messages: [...(messages ?? []), userMsg, { role: 'assistant', content: assistantContent }],
-            }),
-          });
-          const evalData = await evalRes?.json?.();
-          if (evalData?.evaluationId || evalData?.id) {
-            setSimStatus('completed');
-          }
-        } catch (e: any) {
-          console.error('Evaluation error:', e);
-          setSimStatus('completed');
+        if (requiresDoc) {
+          setSimStatus('documenting');
+        } else {
+          await triggerEvaluation([...(messages ?? []), userMsg, { role: 'assistant', content: assistantContent }]);
         }
       }
     } catch (e: any) {
@@ -197,6 +195,59 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
     }
   };
 
+  const triggerEvaluation = async (allMessages?: Message[]) => {
+    setSimStatus('evaluating');
+    try {
+      const evalRes = await fetch('/api/simulation/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          simId,
+          templateId,
+          languageMode,
+          messages: allMessages || messages,
+          documentation: documentation || undefined,
+        }),
+      });
+      await evalRes?.json?.();
+      setSimStatus('completed');
+    } catch {
+      setSimStatus('completed');
+    }
+  };
+
+  const handleEndSimulation = async () => {
+    if (requiresDoc) {
+      setSimStatus('documenting');
+    } else {
+      await triggerEvaluation();
+    }
+  };
+
+  const handleSaveDocumentation = async () => {
+    setDocSaving(true);
+    try {
+      await fetch(`/api/simulations/${simId}/documentation`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentation }),
+      });
+    } catch (e) {
+      console.error('Doc save error:', e);
+    } finally {
+      setDocSaving(false);
+    }
+  };
+
+  const handleSubmitDocumentation = async () => {
+    await handleSaveDocumentation();
+    await triggerEvaluation();
+  };
+
+  const handleSkipDocumentation = async () => {
+    await triggerEvaluation();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e?.key === 'Enter' && !e?.shiftKey) {
       e?.preventDefault?.();
@@ -205,11 +256,85 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
   };
 
   const remaining = Math.max(0, maxTurns - turnCount);
+  const description = templateData
+    ? (lang === 'tr' ? templateData.descriptionTr : templateData.descriptionDe)
+    : '';
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <AppHeader />
       <div className="mx-auto w-full max-w-[800px] flex flex-col flex-1 px-4">
+        {/* Floating Task Description */}
+        {templateData && (
+          <div className="sticky top-[64px] z-30 bg-background/95 backdrop-blur-sm border-b">
+            <button
+              onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+              className="w-full flex items-center justify-between py-2 px-1 text-left hover:bg-muted/30 rounded transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold text-primary truncate">
+                  {lang === 'tr' ? 'Görev Tanımı' : 'Aufgabenstellung'}
+                </span>
+                {!descriptionExpanded && (
+                  <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                    — {lang === 'tr' ? templateData.titleTr : templateData.titleDe}
+                  </span>
+                )}
+              </div>
+              {descriptionExpanded
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              }
+            </button>
+            <AnimatePresence>
+              {descriptionExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pb-3 px-1">
+                    <p className="text-sm leading-relaxed text-foreground/90">{description}</p>
+                    {checklistItems.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-xs font-medium text-muted-foreground cursor-pointer flex items-center gap-1 hover:text-foreground transition-colors">
+                          <ClipboardList className="h-3 w-3" />
+                          {lang === 'tr' ? 'Kontrol Listesi' : 'Checkliste'} ({checklistItems.length} {lang === 'tr' ? 'madde' : 'Punkte'})
+                        </summary>
+                        <ul className="mt-2 space-y-1">
+                          {checklistItems.map((item) => (
+                            <li key={item.id} className="flex items-start gap-2 text-xs">
+                              <span className={`inline-block mt-0.5 h-2 w-2 rounded-full shrink-0 ${
+                                item.weight >= 3 ? 'bg-red-500' : item.weight >= 2 ? 'bg-yellow-500' : 'bg-green-500'
+                              }`} />
+                              <span className="text-muted-foreground">
+                                {lang === 'tr' ? item.textTr : item.textDe}
+                                {item.weight >= 3 && (
+                                  <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
+                                    {lang === 'tr' ? 'Kritik' : 'Kritisch'}
+                                  </Badge>
+                                )}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-1.5 text-[10px] text-muted-foreground">
+                          <span className="inline-block h-2 w-2 rounded-full bg-red-500 mr-1" />{lang === 'tr' ? 'Kritik' : 'Kritisch'}
+                          <span className="inline-block h-2 w-2 rounded-full bg-yellow-500 mx-1 ml-2" />{lang === 'tr' ? 'Önemli' : 'Wichtig'}
+                          <span className="inline-block h-2 w-2 rounded-full bg-green-500 mx-1 ml-2" />{lang === 'tr' ? 'Normal' : 'Normal'}
+                        </p>
+                      </details>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {/* Status Bar */}
         <div className="flex items-center justify-between py-3 border-b">
           <div className="flex items-center gap-2">
@@ -219,35 +344,26 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
             <Badge variant="outline" className="text-xs">
               {languageMode === 'bilingual' ? t('simulation.bilingual') : t('simulation.germanOnly')}
             </Badge>
+            {requiresDoc && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <FileText className="h-3 w-3" />
+                {lang === 'tr' ? 'Dökümantasyon gerekli' : 'Dokumentation erforderlich'}
+              </Badge>
+            )}
           </div>
           {simStatus === 'active' && turnCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                setSimStatus('evaluating');
-                try {
-                  const evalRes = await fetch('/api/simulation/evaluate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ simId, templateId, languageMode, messages }),
-                  });
-                  await evalRes?.json?.();
-                  setSimStatus('completed');
-                } catch { setSimStatus('completed'); }
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={handleEndSimulation}>
               {t('simulation.endSimulation')}
             </Button>
           )}
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-4 min-h-[300px] max-h-[calc(100vh-280px)]">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-4 min-h-[300px] max-h-[calc(100vh-340px)]">
           {(messages ?? [])?.length === 0 && (
             <div className="text-center text-muted-foreground py-12">
               <Stethoscope className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Beginnen Sie das Gespräch mit dem Patienten...</p>
+              <p className="text-sm">{lang === 'tr' ? 'Hasta ile konuşmaya başlayın...' : 'Beginnen Sie das Gespräch...'}</p>
             </div>
           )}
           <AnimatePresence mode="popLayout">
@@ -288,6 +404,61 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
           )}
         </div>
 
+        {/* Documentation Phase */}
+        {simStatus === 'documenting' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="py-4 space-y-4"
+          >
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5 text-primary" />
+                  {lang === 'tr' ? 'Hemşirelik Dokümantasyonu' : 'Pflegedokumentation'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    {lang === 'tr'
+                      ? 'Lütfen bu hasta görüşmesinin hemşirelik dokümantasyonunu yazın. Gözlemlerinizi, bulguları, alınan tedbirleri ve takip planını ekleyin.'
+                      : 'Erstellen Sie nun die Pflegedokumentation zu diesem Patientenkontakt. Beschreiben Sie Ihre Beobachtungen, Befunde, durchgeführte Maßnahmen und den weiteren Pflegeplan.'}
+                  </p>
+                </div>
+                <Textarea
+                  value={documentation}
+                  onChange={(e: any) => setDocumentation(e?.target?.value ?? '')}
+                  placeholder={lang === 'tr'
+                    ? 'Hemşirelik dokümantasyonunuzu buraya yazın...\n\nÖrnek: Hasta bilgileri, gözlemler, bulgular, alınan tedbirler, takip planı...'
+                    : 'Ihre Pflegedokumentation hier eingeben...\n\nBeispiel: Patienteninformationen, Beobachtungen, Befunde, Maßnahmen, weiterer Plan...'}
+                  className="min-h-[200px] resize-y"
+                  rows={10}
+                />
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleSubmitDocumentation}
+                    disabled={docSaving || !documentation.trim()}
+                    className="flex-1 gap-2"
+                  >
+                    {docSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {lang === 'tr' ? 'Gönder ve Değerlendir' : 'Abgeben & Bewerten'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSkipDocumentation}
+                    disabled={docSaving}
+                    className="gap-2"
+                  >
+                    {lang === 'tr' ? 'Atla' : 'Überspringen'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Evaluation/Completed State */}
         {simStatus === 'evaluating' && (
           <div className="py-6 text-center">
@@ -308,7 +479,6 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
         {/* Input Area */}
         {simStatus === 'active' && (
           <div className="border-t py-4">
-            {/* Speech indicator */}
             {isListening && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -347,11 +517,8 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
               {isSpeechSupported && (
                 <Button
                   onClick={() => {
-                    if (isListening) {
-                      stopListening();
-                    } else {
-                      toggleListening();
-                    }
+                    if (isListening) stopListening();
+                    else toggleListening();
                   }}
                   disabled={streaming}
                   size="icon"
