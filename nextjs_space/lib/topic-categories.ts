@@ -128,11 +128,11 @@ export const DIFFICULTY_LEVELS = [
   { id: 'beginner', labelDe: 'Einsteiger', labelTr: 'Başlangıç', color: 'bg-green-500/10 text-green-700', badgeVariant: 'secondary' as const },
   { id: 'intermediate', labelDe: 'Mittel', labelTr: 'Orta', color: 'bg-blue-500/10 text-blue-700', badgeVariant: 'default' as const },
   { id: 'advanced', labelDe: 'Fortgeschritten', labelTr: 'İleri', color: 'bg-orange-500/10 text-orange-700', badgeVariant: 'destructive' as const },
-  { id: 'extreme', labelDe: 'Extrem', labelTr: 'Ekstrem', color: 'bg-red-500/10 text-red-700', badgeVariant: 'destructive' as const },
 ];
 
 export const SIMULATION_TYPES = [
   { id: 'oral_exam', labelDe: 'Mündliche Prüfung', labelTr: 'Sözlü Sınav', icon: 'MessageSquare' },
   { id: 'patient_conversation', labelDe: 'Patientengespräch', labelTr: 'Hasta Görüşmesi', icon: 'Users' },
   { id: 'written_task', labelDe: 'Schriftliche Aufgabe', labelTr: 'Yazılı Görev', icon: 'PenTool' },
+  { id: 'documentation', labelDe: 'Dokumentation', labelTr: 'Dokümantasyon', icon: 'ClipboardList' },
 ];

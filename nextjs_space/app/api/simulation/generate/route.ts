@@ -41,16 +41,16 @@ export async function POST(request: NextRequest) {
       oral_exam: 'Mündliche Prüfung (Prüfungsgespräch mit einem Prüfer)',
       patient_conversation: 'Patientengespräch (Gespräch mit einem Patienten oder Angehörigen)',
       written_task: 'Schriftliche Aufgabe (Pflegeplanung, Pflegebericht oder Dokumentation)',
+      documentation: 'Pflegedokumentation (Erstellen einer vollständigen Pflegedokumentation basierend auf einem Fallbeispiel)',
     };
 
     const difficultyInstructions: Record<string, string> = {
       beginner: 'EINSTEIGER-Niveau: Einfache, klare Aufgabenstellung. Der Patient/Prüfer ist kooperativ und geduldig. Grundlagenwissen wird abgefragt.',
       intermediate: 'MITTLERES Niveau: Komplexere Situation mit mehreren Aspekten. Einige Komplikationen möglich. Fachwissen und Kommunikationsfähigkeit werden geprüft.',
       advanced: 'FORTGESCHRITTENES Niveau: Anspruchsvolle Situation mit Komplikationen, schwierigen Patienten/Angehörigen oder ethischen Dilemmata. Tiefes Fachwissen und Problemlösungskompetenz erforderlich.',
-      extreme: 'EXTREMES Niveau: Hochkomplexe Notfallsituation oder ethisch sehr schwieriges Szenario. Multimorbider Patient mit Komplikationen. Zeitdruck, widersprüchliche Informationen, emotionale Belastung. Prüfungsniveau für erfahrene Fachkräfte.',
     };
 
-    const maxTurns = difficulty === 'beginner' ? 6 : difficulty === 'intermediate' ? 8 : difficulty === 'advanced' ? 10 : 12;
+    const maxTurns = difficulty === 'beginner' ? 6 : difficulty === 'intermediate' ? 8 : 10;
 
     const checklistGuidance: Record<string, string> = {
       patient_conversation: `CHECKLISTE FÜR PATIENTENGESPRÄCH:
@@ -68,9 +68,15 @@ export async function POST(request: NextRequest) {
 - Medizinische Fachsprache ist ERWÜNSCHT und NOTWENDIG.
 - Die Checkliste soll Struktur, Vollständigkeit, korrekte Fachbegriffe und Pflegeplanung prüfen.
 - Füge ein Item hinzu: "Dokumentation erstellt" (wird separat bewertet).`,
+      documentation: `CHECKLISTE FÜR PFLEGEDOKUMENTATION:
+- Medizinische Fachsprache ist ERWÜNSCHT und NOTWENDIG.
+- Die Checkliste soll prüfen: Pflegeanamnese, Pflegeplanung, Pflegebericht, Maßnahmen, Evaluation.
+- Der Kandidat erhält ein Fallbeispiel und muss eine vollständige Pflegedokumentation erstellen.
+- Keine Chat-Interaktion nötig – der Fokus liegt auf der schriftlichen Dokumentation.
+- Die Checkliste soll spezifische Dokumentationsbestandteile prüfen (z.B. Ressourcen, Pflegeziele, geplante Maßnahmen).`,
     };
 
-    const requiresDocumentation = simulationType === 'patient_conversation' || simulationType === 'written_task';
+    const requiresDocumentation = simulationType === 'patient_conversation' || simulationType === 'written_task' || simulationType === 'documentation';
 
     const generatePrompt = `Du bist ein Experte für die Erstellung von Pflegeprüfungs-Simulationen für ausländische Pflegekräfte in Deutschland.
 

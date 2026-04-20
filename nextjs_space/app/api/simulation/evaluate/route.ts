@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const hasChecklist = checklist.length > 0;
     const hasDocumentation = !!(documentation || sim?.documentation);
     const docText = documentation || sim?.documentation || '';
-    const requiresDoc = simType === 'patient_conversation' || simType === 'written_task';
+    const requiresDoc = simType === 'patient_conversation' || simType === 'written_task' || simType === 'documentation';
 
     // RAG context
     let handbookContext = '';
@@ -70,6 +70,10 @@ export async function POST(request: NextRequest) {
 - Medizinische Fachsprache ist ERWÜNSCHT und wird positiv bewertet.
 - Bewerte: Strukturierte Dokumentation, Fachterminologie, Pflegeplanung, Vollständigkeit.
 - Falls Dokumentation vorhanden: Bewerte Struktur, Fachbegriffe und Vollständigkeit.`,
+      documentation: `WICHTIG FÜR PFLEGEDOKUMENTATION:
+- Medizinische Fachsprache ist ERWÜNSCHT und NOTWENDIG.
+- Die Bewertung fokussiert auf die eingereichte Pflegedokumentation.
+- Bewerte: Pflegeanamnese, Pflegeziele, geplante Maßnahmen, Ressourcen, Evaluation, Fachterminologie, Struktur.`,
     };
 
     // Documentation section

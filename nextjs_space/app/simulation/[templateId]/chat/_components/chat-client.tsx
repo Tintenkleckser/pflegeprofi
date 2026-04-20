@@ -84,7 +84,11 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
           const cl = data.template.checklist;
           if (Array.isArray(cl) && cl.length > 0) setChecklistItems(cl);
           const simType = data.template.type;
-          setRequiresDoc(simType === 'patient_conversation' || simType === 'written_task');
+          setRequiresDoc(simType === 'patient_conversation' || simType === 'written_task' || simType === 'documentation');
+          // Documentation-only type: skip chat, go directly to documenting
+          if (simType === 'documentation' && data?.status !== 'completed') {
+            setSimStatus('documenting');
+          }
         }
         if (data?.documentation) setDocumentation(data.documentation);
         const existingMessages: Message[] = (data?.interactions ?? []).flatMap((i: any) => [

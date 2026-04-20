@@ -7,7 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope, Sparkles, Filter, X } from 'lucide-react';
+import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope, Sparkles, Filter, X, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 
@@ -208,12 +208,12 @@ export function DashboardClient() {
                 oral_exam: { icon: MessageSquare, label: 'Mündliche Prüfung', labelTr: 'Sözlü Sınav', color: 'text-blue-600 bg-blue-500/10' },
                 written_task: { icon: PenTool, label: 'Schriftliche Aufgabe', labelTr: 'Yazılı Görev', color: 'text-purple-600 bg-purple-500/10' },
                 patient_conversation: { icon: Users, label: 'Patientengespräch', labelTr: 'Hasta Görüşmesi', color: 'text-green-600 bg-green-500/10' },
+                documentation: { icon: ClipboardList, label: 'Dokumentation', labelTr: 'Dokümantasyon', color: 'text-teal-600 bg-teal-500/10' },
               };
               const difficultyConfig: Record<string, { label: string; labelTr: string; variant: 'default' | 'secondary' | 'destructive' }> = {
                 beginner: { label: 'Einsteiger', labelTr: 'Başlangıç', variant: 'secondary' },
                 intermediate: { label: 'Mittel', labelTr: 'Orta', variant: 'default' },
                 advanced: { label: 'Fortgeschritten', labelTr: 'İleri', variant: 'destructive' },
-                extreme: { label: 'Extrem', labelTr: 'Ekstrem', variant: 'destructive' },
               };
               const tc = typeConfig[tmpl?.type] ?? typeConfig.oral_exam;
               const dc = difficultyConfig[tmpl?.difficulty] ?? difficultyConfig.intermediate;

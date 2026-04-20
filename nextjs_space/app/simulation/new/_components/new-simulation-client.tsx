@@ -21,7 +21,7 @@ const iconMap: Record<string, any> = {
 };
 
 const typeIconMap: Record<string, any> = {
-  MessageSquare, Users, PenTool,
+  MessageSquare, Users, PenTool, ClipboardList,
 };
 
 export function NewSimulationClient() {
