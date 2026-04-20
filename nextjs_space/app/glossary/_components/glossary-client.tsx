@@ -67,9 +67,8 @@ export function GlossaryClient() {
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
-    // Build the text: Term, pause, then explanation
-    const text = `${term.termDe}. ${term.contextDe}`;
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Read only the German term
+    const utterance = new SpeechSynthesisUtterance(term.termDe);
     utterance.lang = 'de-DE';
     utterance.rate = 0.85;
     utterance.pitch = 1;
@@ -149,7 +148,7 @@ export function GlossaryClient() {
                               onClick={() => speakTerm(term)}
                               title={isSpeaking
                                 ? (lang === 'tr' ? 'Durdur' : 'Stoppen')
-                                : (lang === 'tr' ? 'Almanca sesli oku' : 'Auf Deutsch vorlesen')
+                                : (lang === 'tr' ? 'Terimi sesli oku' : 'Begriff vorlesen')
                               }
                             >
                               {isSpeaking
@@ -181,8 +180,8 @@ export function GlossaryClient() {
             <p className="text-xs text-muted-foreground mt-6 flex items-center gap-1.5">
               <Volume2 className="h-3.5 w-3.5" />
               {lang === 'tr'
-                ? 'Hoparlör simgesine tıklayarak terimi ve açıklamayı Almanca dinleyebilirsiniz.'
-                : 'Klicken Sie auf das Lautsprecher-Symbol, um den Begriff und die Erklärung auf Deutsch vorgelesen zu bekommen.'}
+                ? 'Hoparlör simgesine tıklayarak terimi Almanca dinleyebilirsiniz.'
+                : 'Klicken Sie auf das Lautsprecher-Symbol, um den deutschen Begriff vorgelesen zu bekommen.'}
             </p>
           )}
         </motion.div>

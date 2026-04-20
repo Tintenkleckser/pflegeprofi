@@ -276,10 +276,11 @@ WICHTIG:
   ];
 
   for (const term of glossaryTerms) {
+    const stableId = 'glossary-' + term.termDe.toLowerCase().replace(/[^a-z0-9äöüß]/g, '-');
     await prisma.glossaryTerm.upsert({
-      where: { id: term.termDe.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-id' },
+      where: { id: stableId },
       update: { ...term },
-      create: { ...term },
+      create: { id: stableId, ...term },
     });
   }
 
