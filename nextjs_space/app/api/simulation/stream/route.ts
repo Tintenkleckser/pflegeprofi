@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
+import { getRelevantGlossaryContext } from '@/lib/glossary-context';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,15 +37,11 @@ export async function POST(request: NextRequest) {
 
     const isBilingual = languageMode === 'bilingual';
 
-    // Retrieve glossary from DB for bilingual mode
+    // Retrieve only relevant glossary entries for bilingual mode.
     let glossaryContext = '';
     if (isBilingual) {
       try {
-        const glossaryTerms = await prisma.glossaryTerm.findMany({
-          select: { termDe: true, termTr: true },
-          take: 20,
-        });
-        glossaryContext = `\nGLOSSAR (Deutsch - Türkisch):\n${glossaryTerms.map(t => `- ${t.termDe} = ${t.termTr}`).join('\n')}`;
+        glossaryContext = await getRelevantGlossaryContext(userMessage);
       } catch (e) {
         // Fallback: continue without glossary
       }
