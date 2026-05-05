@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { getRelevantGlossaryContext } from '@/lib/glossary-context';
+import { createMistralChatCompletion, type MistralMessage } from '@/lib/mistral';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +77,7 @@ ${glossaryContext}`;
     }
 
     // Build messages array
-    const llmMessages: Array<{ role: string; content: string }> = [
+    const llmMessages: MistralMessage[] = [
       { role: 'system', content: systemPrompt },
     ];
 
@@ -90,19 +91,11 @@ ${glossaryContext}`;
     llmMessages.push({ role: 'user', content: userMessage });
 
     // Call LLM with streaming
-    const llmResponse = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages: llmMessages,
-        stream: true,
-        max_tokens: 800,
-        temperature: 0.7,
-      }),
+    const llmResponse = await createMistralChatCompletion({
+      messages: llmMessages,
+      stream: true,
+      maxTokens: 800,
+      temperature: 0.7,
     });
 
     if (!llmResponse?.ok) {

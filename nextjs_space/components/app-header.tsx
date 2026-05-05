@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, BookOpen, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, LogOut, CircleHelp } from 'lucide-react';
 import Link from 'next/link';
 
 export function AppHeader() {
@@ -36,6 +36,12 @@ export function AppHeader() {
               </Button>
             </>
           )}
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/hilfe" className="gap-2">
+              <CircleHelp className="h-4 w-4" />
+              <span className="hidden sm:inline">Hilfe</span>
+            </Link>
+          </Button>
           <LanguageSwitcher />
           {user && (
             <Button

@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS } from '@/lib/topic-categories';
+import { createMistralChatCompletion } from '@/lib/mistral';
 
 export async function POST(request: NextRequest) {
   try {
@@ -115,18 +116,11 @@ WICHTIG:
 - Passe Komplexität an den Schwierigkeitsgrad an
 - Bei "Extrem": Baue mehrere Komplikationen, Zeitdruck und emotionale Herausforderungen ein`;
 
-    const llmResponse = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages: [{ role: 'user', content: generatePrompt }],
-        temperature: 0.8,
-        max_tokens: 2000,
-      }),
+    const llmResponse = await createMistralChatCompletion({
+      messages: [{ role: 'user', content: generatePrompt }],
+      temperature: 0.8,
+      maxTokens: 2000,
+      responseFormat: { type: 'json_object' },
     });
 
     if (!llmResponse.ok) {

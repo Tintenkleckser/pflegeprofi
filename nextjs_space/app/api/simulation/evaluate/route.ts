@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveEvaluationContext } from '@/lib/handbook-rag';
+import { createMistralChatCompletion } from '@/lib/mistral';
 
 export async function POST(request: NextRequest) {
   try {
@@ -115,22 +116,14 @@ Gib deine Bewertung im folgenden JSON-Format zurück:
 
 Respond with raw JSON only. Do not include code blocks, markdown, or any other formatting.`;
 
-    const llmResponse = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages: [
-          { role: 'system', content: 'Du bist ein Prüfungsbewerter. Antworte ausschließlich mit validem JSON.' },
-          { role: 'user', content: evaluationPrompt },
-        ],
-        max_tokens: 3000,
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      }),
+    const llmResponse = await createMistralChatCompletion({
+      messages: [
+        { role: 'system', content: 'Du bist ein Prüfungsbewerter. Antworte ausschließlich mit validem JSON.' },
+        { role: 'user', content: evaluationPrompt },
+      ],
+      maxTokens: 3000,
+      temperature: 0.3,
+      responseFormat: { type: 'json_object' },
     });
 
     if (!llmResponse?.ok) {

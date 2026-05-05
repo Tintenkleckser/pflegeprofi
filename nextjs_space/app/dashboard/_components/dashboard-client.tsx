@@ -7,7 +7,7 @@ import { AppHeader } from '@/components/app-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Trophy, Clock, TrendingUp, BookOpenCheck, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Stethoscope, Sparkles, Filter, X, ClipboardList } from 'lucide-react';
+import { Play, Trophy, Clock, TrendingUp, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Sparkles, Filter, X, ClipboardList, Target, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 
@@ -77,6 +77,9 @@ export function DashboardClient() {
   const avgTotal = Object.keys(avgScores ?? {})?.length > 0
     ? Object.values(avgScores ?? {}).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0) as number / Object.keys(avgScores ?? {}).length / (completed?.length || 1)
     : 0;
+  const inProgress = (history ?? [])?.filter?.((s: SimHistory) => s?.status === 'in_progress') ?? [];
+  const latestSimulation = history?.[0];
+  const totalScenarios = templates?.length ?? 0;
 
   if (loading) {
     return (
@@ -94,17 +97,76 @@ export function DashboardClient() {
       <AppHeader />
       <main className="mx-auto max-w-[1200px] px-4 py-8">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h1 className="font-display text-3xl font-bold tracking-tight mb-1">{t('dashboard.welcome')}</h1>
-          <p className="text-muted-foreground mb-8">{t('dashboard.subtitle')}</p>
+          <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_360px]">
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-6 sm:p-8">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <Badge variant="secondary" className="mb-4">
+                      {lang === 'tr' ? 'Bugunku calisma alani' : 'Heutiger Lernfokus'}
+                    </Badge>
+                    <h1 className="font-display text-3xl font-bold tracking-tight">{t('dashboard.welcome')}</h1>
+                    <p className="mt-2 max-w-2xl text-muted-foreground">{t('dashboard.subtitle')}</p>
+                  </div>
+                  <Button size="lg" className="gap-2 sm:min-w-56" onClick={() => router.push('/simulation/new')}>
+                    <Sparkles className="h-5 w-5" />
+                    {lang === 'tr' ? 'Yeni Simulasyon' : 'Neue Simulation'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {lang === 'tr' ? 'Sonraki adim' : 'Nächster Schritt'}
+                </CardTitle>
+                <CardDescription>
+                  {latestSimulation
+                    ? (lang === 'tr' ? 'Son calismaniza devam edin veya sonucu acin.' : 'Setzen Sie die letzte Übung fort oder öffnen Sie die Auswertung.')
+                    : (lang === 'tr' ? 'Ilk senaryonuzu secin ve baslayin.' : 'Wählen Sie ein erstes Szenario und starten Sie.')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {latestSimulation ? (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between gap-2"
+                    onClick={() => {
+                      if (latestSimulation?.status === 'completed') {
+                        router.push(`/evaluation/${latestSimulation?.id}`);
+                      } else {
+                        router.push(`/simulation/${latestSimulation?.templateId}/chat?simId=${latestSimulation?.id}`);
+                      }
+                    }}
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      {latestSimulation?.status === 'completed' ? <Trophy className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                      <span className="truncate">
+                        {latestSimulation?.status === 'completed'
+                          ? (lang === 'tr' ? 'Degerlendirmeyi ac' : 'Auswertung öffnen')
+                          : (lang === 'tr' ? 'Devam et' : 'Fortsetzen')}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full justify-between" onClick={() => router.push('/simulation/new')}>
+                    {lang === 'tr' ? 'Senaryo sec' : 'Szenario auswählen'}
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                     <Trophy className="h-5 w-5 text-primary" />
                   </div>
                   <div>
@@ -117,9 +179,9 @@ export function DashboardClient() {
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
                     <BarChart3 className="h-5 w-5 text-green-600" />
                   </div>
                   <div>
@@ -132,14 +194,29 @@ export function DashboardClient() {
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10">
                     <Clock className="h-5 w-5 text-orange-600" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{t('dashboard.inProgress')}</p>
-                    <p className="text-2xl font-bold">{(history ?? [])?.filter?.((s: SimHistory) => s?.status === 'in_progress')?.length ?? 0}</p>
+                    <p className="text-2xl font-bold">{inProgress?.length ?? 0}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                    <Target className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">{lang === 'tr' ? 'Senaryolar' : 'Szenarien'}</p>
+                    <p className="text-2xl font-bold">{totalScenarios}</p>
                   </div>
                 </div>
               </CardContent>
