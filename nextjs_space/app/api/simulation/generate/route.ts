@@ -5,12 +5,22 @@ import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 import { createMistralChatCompletion } from '@/lib/mistral';
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/api-protection';
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const limit = rateLimit({
+      key: `generate:${user.id}:${getClientIp(request)}`,
+      limit: 8,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!limit.allowed) {
+      return rateLimitResponse(limit.resetAt);
     }
 
     const body = await request.json();

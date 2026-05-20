@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/api-protection';
 
 export async function GET() {
   try {
@@ -27,6 +28,16 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const limit = rateLimit({
+      key: `create-simulation:${user.id}:${getClientIp(request)}`,
+      limit: 30,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!limit.allowed) {
+      return rateLimitResponse(limit.resetAt);
+    }
+
     const body = await request.json();
     const { templateId, languageMode } = body ?? {};
     if (!templateId) return NextResponse.json({ error: 'templateId required' }, { status: 400 });

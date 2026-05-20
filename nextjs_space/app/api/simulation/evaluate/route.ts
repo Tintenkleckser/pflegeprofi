@@ -4,12 +4,26 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { retrieveEvaluationContext } from '@/lib/handbook-rag';
 import { createMistralChatCompletion } from '@/lib/mistral';
+import { compactMessages, getClientIp, jsonError, rateLimit, rateLimitResponse, textLength } from '@/lib/api-protection';
+
+const MAX_EVALUATION_MESSAGES = 30;
+const MAX_EVALUATION_MESSAGE_LENGTH = 2500;
+const MAX_DOCUMENTATION_LENGTH = 12000;
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const limit = rateLimit({
+      key: `evaluate:${user.id}:${getClientIp(request)}`,
+      limit: 12,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!limit.allowed) {
+      return rateLimitResponse(limit.resetAt);
     }
 
     const body = await request.json();
@@ -19,13 +33,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'simId required' }, { status: 400 });
     }
 
-    const template = await prisma.simulationTemplate.findUnique({
-      where: { id: templateId },
-    });
+    if (textLength(documentation) > MAX_DOCUMENTATION_LENGTH) {
+      return jsonError('Die Dokumentation ist zu lang.', 413);
+    }
 
-    const sim = await prisma.userSimulation.findUnique({
-      where: { id: simId },
+    const sim = await prisma.userSimulation.findFirst({
+      where: { id: simId, userId: user.id },
     });
+    if (!sim) {
+      return NextResponse.json({ error: 'Simulation nicht gefunden' }, { status: 404 });
+    }
+
+    if (templateId && templateId !== sim.templateId) {
+      return NextResponse.json({ error: 'Template mismatch' }, { status: 400 });
+    }
+
+    const template = await prisma.simulationTemplate.findUnique({
+      where: { id: sim.templateId },
+    });
+    if (!template) {
+      return NextResponse.json({ error: 'Template nicht gefunden' }, { status: 404 });
+    }
 
     const isBilingual = languageMode === 'bilingual';
     const simType = template?.type || 'oral_exam';
@@ -43,7 +71,12 @@ export async function POST(request: NextRequest) {
     } catch (e) { /* continue */ }
 
     // Build conversation text
-    const conversationText = (messages ?? []).map((m: any) => {
+    const safeMessages = compactMessages(messages, {
+      maxMessages: MAX_EVALUATION_MESSAGES,
+      maxContentLength: MAX_EVALUATION_MESSAGE_LENGTH,
+    });
+
+    const conversationText = safeMessages.map((m: any) => {
       const role = m?.role === 'user' ? 'Kandidat' : (simType === 'patient_conversation' ? 'Patient' : 'Prüfer');
       return `${role}: ${m?.content ?? ''}`;
     }).join('\n');

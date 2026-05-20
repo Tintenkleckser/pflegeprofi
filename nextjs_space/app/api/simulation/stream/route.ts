@@ -5,12 +5,30 @@ import { prisma } from '@/lib/db';
 import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { getRelevantGlossaryContext } from '@/lib/glossary-context';
 import { createMistralChatCompletion, type MistralMessage } from '@/lib/mistral';
+import { compactMessages, getClientIp, rateLimit, textLength } from '@/lib/api-protection';
+
+const MAX_USER_MESSAGE_LENGTH = 2000;
+const MAX_PREVIOUS_MESSAGES = 20;
+const MAX_PREVIOUS_MESSAGE_LENGTH = 2000;
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    }
+
+    const limit = rateLimit({
+      key: `stream:${user.id}:${getClientIp(request)}`,
+      limit: 40,
+      windowMs: 60 * 60 * 1000,
+    });
+    if (!limit.allowed) {
+      const retryAfter = Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000));
+      return new Response(
+        JSON.stringify({ error: 'Zu viele Anfragen. Bitte versuchen Sie es gleich erneut.' }),
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
     }
 
     const body = await request.json();
@@ -28,9 +46,29 @@ export async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
+    if (textLength(userMessage) > MAX_USER_MESSAGE_LENGTH) {
+      return new Response(JSON.stringify({ error: 'Die Eingabe ist zu lang.' }), { status: 413 });
+    }
+
+    const simulation = await prisma.userSimulation.findFirst({
+      where: { id: simId, userId: user.id },
+      select: { id: true, templateId: true, status: true },
+    });
+    if (!simulation) {
+      return new Response(JSON.stringify({ error: 'Simulation not found' }), { status: 404 });
+    }
+
+    if (simulation.status === 'completed') {
+      return new Response(JSON.stringify({ error: 'Simulation is already completed' }), { status: 409 });
+    }
+
+    if (templateId && templateId !== simulation.templateId) {
+      return new Response(JSON.stringify({ error: 'Template mismatch' }), { status: 400 });
+    }
+
     // Get template
     const template = await prisma.simulationTemplate.findUnique({
-      where: { id: templateId },
+      where: { id: simulation.templateId },
     });
     if (!template) {
       return new Response(JSON.stringify({ error: 'Template not found' }), { status: 404 });
@@ -82,7 +120,12 @@ ${glossaryContext}`;
     ];
 
     // Add previous conversation
-    for (const msg of (previousMessages ?? [])) {
+    const safePreviousMessages = compactMessages(previousMessages, {
+      maxMessages: MAX_PREVIOUS_MESSAGES,
+      maxContentLength: MAX_PREVIOUS_MESSAGE_LENGTH,
+    });
+
+    for (const msg of safePreviousMessages) {
       llmMessages.push({
         role: msg?.role === 'user' ? 'user' : 'assistant',
         content: msg?.content ?? '',
