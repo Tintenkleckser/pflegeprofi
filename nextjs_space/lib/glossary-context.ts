@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { getGermanSearchVariants } from '@/lib/text-normalization';
 
 const STOP_WORDS = new Set([
   'aber',
@@ -39,9 +40,10 @@ function getSearchTokens(text: string) {
   return Array.from(
     new Set(
       (text ?? '')
-        .toLowerCase()
+        .toLocaleLowerCase('de-DE')
         .match(/[\p{L}\p{N}]+/gu)
         ?.filter((token) => token.length >= 3 && !STOP_WORDS.has(token))
+        .flatMap((token) => getGermanSearchVariants(token))
         .slice(0, 12) ?? [],
     ),
   );

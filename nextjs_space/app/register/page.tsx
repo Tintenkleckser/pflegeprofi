@@ -76,7 +76,7 @@ export default function RegisterPage() {
           >
             <div className="mb-8 flex flex-col items-center lg:hidden">
               <div className="relative mb-2 h-20 w-20">
-                <img src="/synthema-logo.png" alt="SYNTHEMA - KI-gestutzte Qualifizierung" className="h-full w-full object-contain" />
+                <img src="/icons/icon-192.png?v=eucon-care-1" alt="EUCON PflegeProfi" className="h-full w-full rounded-xl object-contain" />
               </div>
               <h1 className="font-display text-2xl font-bold tracking-tight">{t('common.appName')}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{t('common.tagline')}</p>
@@ -169,7 +169,7 @@ export default function RegisterPage() {
 
         <section className="hidden border-l bg-muted/30 px-10 py-12 lg:flex lg:flex-col lg:justify-between">
           <div className="flex items-center gap-3">
-            <img src="/synthema-logo.png" alt="SYNTHEMA" className="h-10 w-10 object-contain" />
+            <img src="/icons/icon-192.png?v=eucon-care-1" alt="EUCON PflegeProfi" className="h-12 w-12 rounded-lg object-contain" />
             <div>
               <p className="font-display text-xl font-bold tracking-tight">{t('common.appName')}</p>
               <p className="text-sm text-muted-foreground">{t('common.tagline')}</p>

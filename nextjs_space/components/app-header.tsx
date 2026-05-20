@@ -16,7 +16,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <img src="/synthema-logo.png" alt="SYNTHEMA" className="h-8 w-8 object-contain" />
+          <img src="/icons/icon-192.png?v=eucon-care-1" alt="EUCON PflegeProfi" className="h-9 w-9 rounded-md object-contain" />
           <span className="font-display text-lg font-bold tracking-tight">{t('common.appName')}</span>
         </Link>
         <nav className="flex items-center gap-1">

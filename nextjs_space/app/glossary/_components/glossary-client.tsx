@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BookOpen, Search, ArrowRightLeft, Volume2, Square } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { germanSearchIncludes } from '@/lib/text-normalization';
 
 interface GlossaryItem {
   id: string;
@@ -87,12 +88,13 @@ export function GlossaryClient() {
   }, [ttsSupported, speakingId]);
 
   const filtered = (terms ?? []).filter((term: GlossaryItem) => {
-    const q = (search ?? '').toLowerCase();
+    const q = search ?? '';
+    if (!q.trim()) return true;
     return (
-      (term?.termDe ?? '').toLowerCase().includes(q) ||
-      (term?.termTr ?? '').toLowerCase().includes(q) ||
-      (term?.contextDe ?? '').toLowerCase().includes(q) ||
-      (term?.contextTr ?? '').toLowerCase().includes(q)
+      germanSearchIncludes(term?.termDe ?? '', q) ||
+      germanSearchIncludes(term?.termTr ?? '', q) ||
+      germanSearchIncludes(term?.contextDe ?? '', q) ||
+      germanSearchIncludes(term?.contextTr ?? '', q)
     );
   });
 

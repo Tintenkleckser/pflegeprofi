@@ -46,7 +46,7 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Speech Recognition
-  const speechLang = lang === 'tr' ? 'tr-TR' : 'de-DE';
+  const speechLang = 'de-DE';
   const {
     isListening,
     isSupported: isSpeechSupported,

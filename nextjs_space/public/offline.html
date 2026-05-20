@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0891b2" />
+    <title>PflegeProfi ist offline</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      main {
+        width: min(100%, 420px);
+        text-align: center;
+      }
+
+      img {
+        width: 72px;
+        height: 72px;
+        object-fit: contain;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: 1.35rem;
+        line-height: 1.2;
+        margin: 0 0 12px;
+      }
+
+      p {
+        color: #475569;
+        line-height: 1.55;
+        margin: 0;
+      }
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        margin-top: 24px;
+        padding: 0 18px;
+        border-radius: 8px;
+        background: #0891b2;
+        color: white;
+        text-decoration: none;
+        font-weight: 650;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icons/icon-192.png" alt="" />
+      <h1>Gerade keine Verbindung</h1>
+      <p>PflegeProfi braucht fuer Login, Lernstand und Simulationen eine Internetverbindung. Bitte versuchen Sie es erneut, sobald Sie wieder online sind.</p>
+      <a href="/dashboard">Erneut versuchen</a>
+    </main>
+  </body>
+</html>

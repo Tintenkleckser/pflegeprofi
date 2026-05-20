@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { getGermanSearchVariants, normalizeGermanSearchText } from '@/lib/text-normalization';
 
 /**
  * Simple keyword-based retrieval from handbook sections.
@@ -12,18 +13,20 @@ export async function retrieveHandbookContext(
 ): Promise<string> {
   // Extract meaningful words (>3 chars) from query
   const queryWords = query
-    .toLowerCase()
-    .replace(/[^a-zäöüß\s]/g, '')
-    .split(/\s+/)
+    .toLocaleLowerCase('de-DE')
+    .match(/[\p{L}\p{N}]+/gu)
+    ?.flatMap((word) => getGermanSearchVariants(word))
     .filter(w => w.length > 3);
 
-  if (queryWords.length === 0) return '';
+  const uniqueQueryWords = Array.from(new Set(queryWords ?? []));
+
+  if (uniqueQueryWords.length === 0) return '';
 
   // Build search conditions using PostgreSQL full-text or ILIKE
   const sections = await prisma.handbookSection.findMany({
     where: {
       domain,
-      OR: queryWords.flatMap(word => [
+      OR: uniqueQueryWords.flatMap(word => [
         { title: { contains: word, mode: 'insensitive' as const } },
         { content: { contains: word, mode: 'insensitive' as const } },
         { keywords: { has: word } },
@@ -42,10 +45,10 @@ export async function retrieveHandbookContext(
 
   // Rank by relevance (number of matching keywords)
   const ranked = sections.map(section => {
-    const text = `${section.title} ${section.content} ${section.keywords.join(' ')}`.toLowerCase();
-    const score = queryWords.reduce((s, word) => {
-      const matches = (text.match(new RegExp(word, 'gi')) || []).length;
-      return s + matches;
+    const text = normalizeGermanSearchText(`${section.title} ${section.content} ${section.keywords.join(' ')}`);
+    const score = uniqueQueryWords.reduce((s, word) => {
+      const normalizedWord = normalizeGermanSearchText(word);
+      return s + (text.includes(normalizedWord) ? 1 : 0);
     }, 0);
     return { ...section, score };
   });
