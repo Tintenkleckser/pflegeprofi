@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS, SIMULATION_TYPES, type TopicCategory } from '@/lib/topic-categories';
+import { AiDisclaimer } from '@/components/ai-disclaimer';
 
 const iconMap: Record<string, any> = {
   Stethoscope, MessageSquare, ShieldCheck, Activity, Heart, HeartPulse,
@@ -94,6 +95,10 @@ export function NewSimulationClient() {
             </div>
           </div>
         </motion.div>
+
+        <div className="mt-6">
+          <AiDisclaimer compact />
+        </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 my-6">

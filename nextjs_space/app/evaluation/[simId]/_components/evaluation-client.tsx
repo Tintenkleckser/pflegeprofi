@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Trophy, ArrowLeft, RotateCcw, MessageSquare, Award, TrendingUp, CheckCircle2, XCircle, ClipboardList, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { AiDisclaimer } from '@/components/ai-disclaimer';
 
 interface ChecklistResult {
   id: string;
@@ -150,6 +151,10 @@ export function EvaluationClient({ simId }: { simId: string }) {
           <p className="text-muted-foreground mb-6">
             {lang === 'tr' ? data?.template?.titleTr : data?.template?.titleDe}
           </p>
+
+          <div className="mb-6">
+            <AiDisclaimer compact />
+          </div>
 
           {/* Overall Score */}
           <Card className="mb-6 border-primary/20">

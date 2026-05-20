@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Trophy, Clock, TrendingUp, ChevronRight, BarChart3, MessageSquare, PenTool, Users, Sparkles, Filter, X, ClipboardList, Target, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DIFFICULTY_LEVELS } from '@/lib/topic-categories';
+import { AccountDeleteSection } from '@/components/account-delete-section';
 
 interface SimTemplate {
   id: string;
@@ -395,6 +396,10 @@ export function DashboardClient() {
               ))}
             </div>
           )}
+        </motion.div>
+
+        <motion.div className="mt-10" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+          <AccountDeleteSection />
         </motion.div>
       </main>
     </div>

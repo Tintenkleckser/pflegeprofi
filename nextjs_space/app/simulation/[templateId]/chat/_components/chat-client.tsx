@@ -11,6 +11,7 @@ import { GlossaryTooltip } from '@/components/glossary-tooltip';
 import { Send, User, Stethoscope, Loader2, CheckCircle2, Mic, MicOff, ChevronDown, ChevronUp, FileText, ClipboardList, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
+import { AiDisclaimer } from '@/components/ai-disclaimer';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -268,6 +269,9 @@ export function ChatClient({ templateId, simId }: { templateId: string; simId: s
     <div className="min-h-screen bg-background flex flex-col">
       <AppHeader />
       <div className="mx-auto w-full max-w-[800px] flex flex-col flex-1 px-4">
+        <div className="py-3">
+          <AiDisclaimer compact />
+        </div>
         {/* Floating Task Description */}
         {templateData && (
           <div className="sticky top-[64px] z-30 bg-background/95 backdrop-blur-sm border-b">
