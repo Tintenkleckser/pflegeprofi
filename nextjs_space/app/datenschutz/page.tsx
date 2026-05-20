@@ -5,18 +5,22 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Datenschutz"
-      description="Datenschutzhinweise zu PflegeProfi. Verantwortliche Stelle, Kontaktdaten und Verträge müssen vor dem endgültigen Produktivbetrieb final ergänzt und rechtlich geprüft werden."
+      description="Datenschutzhinweise zu PflegeProfi."
     >
       <LegalSection title="Verantwortliche Stelle">
         <p>
-          Verantwortlich fur PflegeProfi ist die im{' '}
-          <Link href="/impressum" className="font-medium text-primary hover:underline">Impressum</Link>
-          {' '}genannte Person oder Organisation.
+          Verantwortlich für PflegeProfi ist EUCON e.V., Schwanthalerstr. 120, 80339 München, Deutschland.
         </p>
-        <div className="rounded-lg border border-dashed p-4">
-          <p className="font-medium text-foreground">Noch verbindlich zu ergänzen</p>
-          <p>Name/Firma, Anschrift, E-Mail-Adresse, ggf. Datenschutzkontakt und vertretungsberechtigte Person.</p>
-        </div>
+        <p>
+          E-Mail:{' '}
+          <a className="font-medium text-primary hover:underline" href="mailto:hillenbrand@euconev.de">
+            hillenbrand@euconev.de
+          </a>
+        </p>
+        <p>
+          Weitere Angaben finden Sie im{' '}
+          <Link href="/impressum" className="font-medium text-primary hover:underline">Impressum</Link>.
+        </p>
       </LegalSection>
 
       <LegalSection title="Zwecke der Verarbeitung">
@@ -166,7 +170,6 @@ export default function PrivacyPage() {
 
       <LegalSection title="Noch offen vor Produktivbetrieb">
         <ul className="list-disc space-y-2 pl-5">
-          <li>Vollstandiges Impressum mit Verantwortlichem und Kontaktangaben.</li>
           <li>Rechtsgrundlagen je Verarbeitungstatigkeit.</li>
           <li>Auftragsverarbeitungsvertrage fur Hosting, Supabase, KI-Anbieter und ggf. Chatbase.</li>
           <li>Vercel-Umgebungsvariablen fur Kontolöschung und Löschlauf setzen: SUPABASE_SERVICE_ROLE_KEY und CRON_SECRET.</li>
