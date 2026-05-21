@@ -1,17 +1,34 @@
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
-const DEFAULT_MODEL = process.env.MISTRAL_MODEL || 'mistral-large-latest';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-large-latest';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 
-export type MistralMessage = {
+export type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
 };
 
-export function getMistralApiKey() {
-  const apiKey = process.env.MISTRAL_API_KEY;
-  if (!apiKey) {
-    throw new Error('MISTRAL_API_KEY ist nicht gesetzt');
+// Kept for the existing route imports while the app supports both providers.
+export type MistralMessage = ChatMessage;
+
+function getChatProvider() {
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      apiKey: process.env.OPENAI_API_KEY,
+      apiUrl: OPENAI_API_URL,
+      model: DEFAULT_OPENAI_MODEL,
+    };
   }
-  return apiKey;
+
+  if (process.env.MISTRAL_API_KEY) {
+    return {
+      apiKey: process.env.MISTRAL_API_KEY,
+      apiUrl: MISTRAL_API_URL,
+      model: DEFAULT_MISTRAL_MODEL,
+    };
+  }
+
+  throw new Error('OPENAI_API_KEY oder MISTRAL_API_KEY ist nicht gesetzt');
 }
 
 export async function createMistralChatCompletion({
@@ -21,20 +38,22 @@ export async function createMistralChatCompletion({
   responseFormat,
   stream = false,
 }: {
-  messages: MistralMessage[];
+  messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
   responseFormat?: { type: 'json_object' };
   stream?: boolean;
 }) {
-  return fetch(MISTRAL_API_URL, {
+  const provider = getChatProvider();
+
+  return fetch(provider.apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${getMistralApiKey()}`,
+      Authorization: `Bearer ${provider.apiKey}`,
     },
     body: JSON.stringify({
-      model: DEFAULT_MODEL,
+      model: provider.model,
       messages,
       max_tokens: maxTokens,
       temperature,

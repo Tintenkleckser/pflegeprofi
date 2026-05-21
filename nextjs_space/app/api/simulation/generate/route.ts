@@ -7,6 +7,26 @@ import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 import { createMistralChatCompletion } from '@/lib/mistral';
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/api-protection';
 
+function parseGeneratedScenario(content: string) {
+  const cleaned = content
+    .replace(/^\uFEFF/, '')
+    .replace(/```json\n?/gi, '')
+    .replace(/```\n?/g, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace <= firstBrace) {
+      throw error;
+    }
+
+    return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -129,7 +149,7 @@ WICHTIG:
     const llmResponse = await createMistralChatCompletion({
       messages: [{ role: 'user', content: generatePrompt }],
       temperature: 0.8,
-      maxTokens: 2000,
+      maxTokens: 3500,
       responseFormat: { type: 'json_object' },
     });
 
@@ -142,13 +162,14 @@ WICHTIG:
     const llmData = await llmResponse.json();
     const content = llmData?.choices?.[0]?.message?.content ?? '';
     
-    // Parse JSON from response (handle potential markdown wrapping)
     let parsed;
     try {
-      const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      parsed = JSON.parse(jsonStr);
+      parsed = parseGeneratedScenario(content);
     } catch (e) {
-      console.error('Failed to parse LLM response:', content);
+      console.error('Failed to parse LLM response:', {
+        finishReason: llmData?.choices?.[0]?.finish_reason,
+        content,
+      });
       return NextResponse.json({ error: 'Szenario konnte nicht generiert werden. Bitte versuchen Sie es erneut.' }, { status: 500 });
     }
 
