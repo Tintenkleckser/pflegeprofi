@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { prisma } from '@/lib/db';
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/api-protection';
+import { isNursingScopeTemplate } from '@/lib/nursing-scope';
 
 export async function GET() {
   try {
@@ -41,6 +42,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { templateId, languageMode } = body ?? {};
     if (!templateId) return NextResponse.json({ error: 'templateId required' }, { status: 400 });
+
+    const template = await prisma.simulationTemplate.findUnique({
+      where: { id: templateId },
+      select: {
+        titleDe: true,
+        titleTr: true,
+        descriptionDe: true,
+        descriptionTr: true,
+        systemPrompt: true,
+      },
+    });
+    if (!template) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    }
+    if (!isNursingScopeTemplate(template)) {
+      console.error('Blocked out-of-scope simulation template:', templateId);
+      return NextResponse.json(
+        { error: 'Diese Simulation liegt nicht im Pflegebereich und wurde gesperrt.' },
+        { status: 422 },
+      );
+    }
+
     const simulation = await prisma.userSimulation.create({
       data: {
         userId: user.id,

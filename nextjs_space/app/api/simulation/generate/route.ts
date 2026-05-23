@@ -6,6 +6,7 @@ import { retrieveHandbookContext } from '@/lib/handbook-rag';
 import { TOPIC_CATEGORIES, DIFFICULTY_LEVELS } from '@/lib/topic-categories';
 import { createMistralChatCompletion } from '@/lib/mistral';
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/api-protection';
+import { containsOutOfScopeClinicianRole, NURSING_SCOPE_GUARDRAILS } from '@/lib/nursing-scope';
 
 function parseGeneratedScenario(content: string) {
   const cleaned = content
@@ -110,6 +111,8 @@ export async function POST(request: NextRequest) {
 
     const generatePrompt = `Du bist ein Experte für die Erstellung von Pflegeprüfungs-Simulationen für ausländische Pflegekräfte in Deutschland.
 
+${NURSING_SCOPE_GUARDRAILS}
+
 Erstelle ein realistisches Prüfungsszenario zum Thema "${topic.titleDe}" (${topic.descriptionDe}).
 
 Typ: ${typeLabels[simulationType] || simulationType}
@@ -124,7 +127,7 @@ Antworte AUSSCHLIESSLICH als valides JSON mit folgender Struktur (KEINE Markdown
   "titleTr": "Gleicher Titel auf Türkisch",
   "descriptionDe": "Ausführliche Aufgabenstellung (3-5 Sätze) auf Deutsch. Beschreibe die Situation, den Patienten und die Erwartungen.",
   "descriptionTr": "Gleiche Aufgabenstellung auf Türkisch",
-  "systemPrompt": "Detaillierte Rollenanweisung für den KI-Prüfer/Patienten. Beschreibe: Name, Alter, Vorgeschichte, Beschwerden, Persönlichkeit, Gesprächsverhalten. Mindestens 200 Wörter.${simulationType === 'patient_conversation' ? ' Baue subtile Auffälligkeiten ein (z.B. Ängstlichkeit, Vergesslichkeit, beginnende Demenz, Depression), die ein aufmerksamer Pfleger erkennen sollte.' : ''}",
+  "systemPrompt": "Detaillierte Rollenanweisung für das KI-Gegenüber (Patient/in, Angehörige/r, Pflegekolleg/in oder Prüfer/in). Beschreibe: Name, Alter, Vorgeschichte, Beschwerden, Persönlichkeit, Gesprächsverhalten. Mindestens 200 Wörter. Die lernende Person bleibt immer Pflegefachkraft oder Pflege-Prüfungskandidat/in.${simulationType === 'patient_conversation' ? ' Baue subtile Auffälligkeiten ein (z.B. Ängstlichkeit, Vergesslichkeit, beginnende Demenz, Depression), die ein aufmerksamer Pfleger erkennen sollte.' : ''}",
   "evaluationCriteria": ["Kriterium1", "Kriterium2", ...],
   "checklist": [
     {"id": "1", "textDe": "Beschreibung der Aufgabe auf Deutsch", "textTr": "Türkische Übersetzung", "category": "Kategorie", "weight": 1-3},
@@ -141,6 +144,9 @@ ${requiresDocumentation ? '- Füge mindestens ein Item der Kategorie "Dokumentat
 
 WICHTIG:
 - Das Szenario muss realistisch und prüfungsrelevant sein
+- Das Szenario muss eindeutig im Verantwortungsbereich der Pflege bleiben
+- Die lernende Person darf niemals eine Assistenzarzt-, Arzt-, Ärztin- oder Medizinerrolle übernehmen
+- Ärztliche Aufgaben sind nur als Übergabe, Rücksprache, Arzt informieren oder Handeln nach ärztlicher Anordnung zulässig
 - Verwende echte medizinische Fachbegriffe im systemPrompt
 - Der systemPrompt muss sehr detailliert sein, damit die KI die Rolle überzeugend spielen kann
 - Passe Komplexität an den Schwierigkeitsgrad an
@@ -171,6 +177,14 @@ WICHTIG:
         content,
       });
       return NextResponse.json({ error: 'Szenario konnte nicht generiert werden. Bitte versuchen Sie es erneut.' }, { status: 500 });
+    }
+
+    if (containsOutOfScopeClinicianRole(parsed)) {
+      console.error('Generated scenario blocked because it leaves nursing scope:', parsed);
+      return NextResponse.json(
+        { error: 'Szenario wurde verworfen, weil es nicht eindeutig im Pflegebereich bleibt. Bitte erneut generieren.' },
+        { status: 422 },
+      );
     }
 
     // Save as new SimulationTemplate
